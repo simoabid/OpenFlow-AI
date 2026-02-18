@@ -24,9 +24,7 @@ import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import com.android.billingclient.api.*
 import com.seemoo.openflow.v2.AgentService
-import com.seemoo.openflow.utilities.FreemiumManager
 import com.seemoo.openflow.utilities.Logger
 import com.seemoo.openflow.utilities.OnboardingManager
 import com.seemoo.openflow.utilities.PermissionManager
@@ -39,8 +37,6 @@ import com.seemoo.openflow.utilities.OpenFlowStateManager
 import com.seemoo.openflow.utilities.DeltaStateColorMapper
 import com.seemoo.openflow.views.DeltaSymbolView
 import com.google.firebase.Firebase
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
 import com.google.firebase.remoteconfig.remoteConfig
 import kotlinx.coroutines.Dispatchers
@@ -57,29 +53,21 @@ class MainActivity : BaseNavigationActivity() {
     private lateinit var userId: String
     private lateinit var permissionManager: PermissionManager
     private lateinit var wakeWordManager: WakeWordManager
-    private lateinit var auth: FirebaseAuth
-    private lateinit var tasksLeftTag: View
-    private lateinit var freemiumManager: FreemiumManager
     private lateinit var wakeWordHelpLink: TextView
     private lateinit var increaseLimitsLink: TextView
     private lateinit var onboardingManager: OnboardingManager
     private lateinit var requestRoleLauncher: ActivityResultLauncher<Intent>
-    private lateinit var billingStatusTextView: TextView
     private lateinit var statusTextView: TextView
-    private lateinit var loadingOverlay: View
     private lateinit var openflowStateManager: OpenFlowStateManager
     private lateinit var stateChangeListener: (OpenFlowState) -> Unit
-    private lateinit var proSubscriptionTag: View
     private lateinit var permissionsTag: View
     private lateinit var permissionsStatusTag: TextView
-    private lateinit var tasksLeftText: TextView
     private lateinit var deltaSymbol: DeltaSymbolView
 
 
     private lateinit var root: View
     companion object {
         const val ACTION_WAKE_WORD_FAILED = "com.seemoo.openflow.WAKE_WORD_FAILED"
-        const val ACTION_PURCHASE_UPDATED = "com.seemoo.openflow.PURCHASE_UPDATED"
     }
     
     private val wakeWordFailureReceiver = object : BroadcastReceiver() {
@@ -93,16 +81,7 @@ class MainActivity : BaseNavigationActivity() {
         }
     }
     
-    private val purchaseUpdateReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == ACTION_PURCHASE_UPDATED) {
-                Logger.d("MainActivity", "Received purchase update broadcast.")
-                // Refresh billing status
-                showLoading(true)
-                performBillingCheck()
-            }
-        }
-    }
+
 
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
@@ -120,18 +99,10 @@ class MainActivity : BaseNavigationActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        auth = Firebase.auth
-        val currentUser = auth.currentUser
-        val profileManager = UserProfileManager(this)
-
-        if (currentUser == null || !profileManager.isProfileComplete()) {
-            startActivity(Intent(this, LoginActivity::class.java))
-            finish()
-            return
-        }
+        // Check if onboarding is completed
         onboardingManager = OnboardingManager(this)
         if (!onboardingManager.isOnboardingCompleted()) {
-            Logger.d("MainActivity", "User is logged in but onboarding not completed. Relaunching permissions stepper.")
+            Logger.d("MainActivity", "Onboarding not completed. Launching permissions stepper.")
             startActivity(Intent(this, OnboardingPermissionsActivity::class.java))
             finish()
             return
@@ -166,26 +137,17 @@ class MainActivity : BaseNavigationActivity() {
         permissionManager.initializePermissionLauncher()
 
         managePermissionsButton = findViewById(R.id.btn_manage_permissions)
-        tasksLeftText = findViewById(R.id.tasks_left_tag_text)
-        tasksLeftTag = findViewById(R.id.tasks_left_tag)
         tvPermissionStatus = findViewById(R.id.tv_permission_status)
         wakeWordHelpLink = findViewById(R.id.wakeWordHelpLink)
-        billingStatusTextView = findViewById(R.id.billing_status_textview)
         statusTextView = findViewById(R.id.status_text)
-        loadingOverlay = findViewById(R.id.loading_overlay)
-        proSubscriptionTag = findViewById(R.id.pro_subscription_tag)
         permissionsTag = findViewById(R.id.permissions_tag)
         permissionsStatusTag = findViewById(R.id.permissions_status_tag)
         deltaSymbol = findViewById(R.id.delta_symbol)
-        freemiumManager = FreemiumManager()
         updateStatusText(OpenFlowState.IDLE)
-        setupProBanner()
         initializeOpenFlowStateManager()
         wakeWordManager = WakeWordManager(this, requestPermissionLauncher)
         handler = Handler(Looper.getMainLooper())
         setupClickListeners()
-        showLoading(true)
-        performBillingCheck()
         
         lifecycleScope.launch {
             val videoUrl = "https://storage.googleapis.com/OpenFlow-AI-app-assets/wake_word_demo.mp4"
@@ -237,14 +199,6 @@ class MainActivity : BaseNavigationActivity() {
 
     override fun onStart() {
         super.onStart()
-        if (auth.currentUser == null) {
-            startActivity(Intent(this, LoginActivity::class.java))
-            finish()
-            return
-        }
-        
-        showLoading(true)
-        performBillingCheck()
     }
 
     private fun handleIntent(intent: Intent?) {
@@ -303,15 +257,9 @@ class MainActivity : BaseNavigationActivity() {
     }
 
     private fun requestLimitIncrease() {
-        val userEmail = auth.currentUser?.email
-        if (userEmail.isNullOrEmpty()) {
-            Toast.makeText(this, "Could not get your email. Please try again.", Toast.LENGTH_SHORT).show()
-            return
-        }
-
         val recipient = "seemooabid@gmail.com"
         val subject = "I am facing issue in"
-        val body = "Hello,\n\nI am facing issue for my account: $userEmail\n <issue-content>.... \n\nThank you."
+        val body = "Hello,\n\nI am facing an issue with OpenFlow-AI.\n <issue-content>.... \n\nThank you."
 
         val intent = Intent(Intent.ACTION_SENDTO).apply {
             data = Uri.parse("mailto:") // Only email apps should handle this
@@ -328,20 +276,6 @@ class MainActivity : BaseNavigationActivity() {
         }
     }
 
-
-    private fun setupProBanner() {
-        val proBanner = findViewById<View>(R.id.pro_upgrade_banner)
-        val upgradeButton = findViewById<TextView>(R.id.upgrade_button)
-        
-        upgradeButton.setOnClickListener {
-            // Navigate to Pro purchase screen (Requirement 2.3)
-            val intent = Intent(this, ProPurchaseActivity::class.java)
-            startActivity(intent)
-        }
-        
-        // Initially hide the banner - it will be shown/hidden based on subscription status
-        proBanner.visibility = View.GONE
-    }
 
     /**
      * Initialize OpenFlowStateManager and set up state change listeners
@@ -373,20 +307,15 @@ class MainActivity : BaseNavigationActivity() {
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
     override fun onResume() {
         super.onResume()
-        showLoading(true)
-        performBillingCheck()
         displayDeveloperMessage()
         updateDeltaVisuals(openflowStateManager.getCurrentState())
         updateUI()
         openflowStateManager.startMonitoring()
         val wakeWordFilter = IntentFilter(ACTION_WAKE_WORD_FAILED)
-        val purchaseFilter = IntentFilter(ACTION_PURCHASE_UPDATED)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(wakeWordFailureReceiver, wakeWordFilter, RECEIVER_NOT_EXPORTED)
-            registerReceiver(purchaseUpdateReceiver, purchaseFilter, RECEIVER_NOT_EXPORTED)
         } else {
             registerReceiver(wakeWordFailureReceiver, wakeWordFilter)
-            registerReceiver(purchaseUpdateReceiver, purchaseFilter)
         }
     }
 
@@ -395,7 +324,6 @@ class MainActivity : BaseNavigationActivity() {
         openflowStateManager.stopMonitoring()
         try {
             unregisterReceiver(wakeWordFailureReceiver)
-            unregisterReceiver(purchaseUpdateReceiver)
         } catch (e: IllegalArgumentException) {
             Logger.d("MainActivity", "Receivers were not registered")
         }
@@ -488,53 +416,6 @@ class MainActivity : BaseNavigationActivity() {
             ContextCompat.getColor(this, R.color.white)
         )
     }
-    private fun updateTaskCounter() {
-        lifecycleScope.launch {
-            val isUserSub = freemiumManager.isUserSubscribed()
-            if(isUserSub){
-                tasksLeftTag.visibility = View.GONE
-            }
-            val tasksLeft = freemiumManager.getTasksRemaining()
-            tasksLeftText.text = "$tasksLeft tasks left"
-        }
-    }
-
-    private fun updateBillingStatus() {
-        lifecycleScope.launch {
-            try {
-                val isSubscribed = freemiumManager.isUserSubscribed()
-                val billingClientReady = MyApplication.isBillingClientReady.value
-                val proBanner = findViewById<View>(R.id.pro_upgrade_banner)
-                if (proBanner == null) {
-                    Logger.w("MainActivity", "pro_banner view not found in updateBillingStatus")
-                    return@launch
-                }
-                when {
-                    !billingClientReady -> {
-                        proSubscriptionTag.visibility = View.GONE
-                        proBanner.visibility = View.VISIBLE
-                    }
-                    isSubscribed -> {
-                        proSubscriptionTag.visibility = View.VISIBLE
-                        proBanner.visibility = View.GONE
-                    }
-                    else -> {
-                        proSubscriptionTag.visibility = View.GONE
-                        proBanner.visibility = View.VISIBLE
-                    }
-                }
-            } catch (e: Exception) {
-                Logger.e("MainActivity", "Error updating billing status", e)
-                proSubscriptionTag.visibility = View.GONE
-                val proBanner = findViewById<View>(R.id.pro_upgrade_banner)
-                if (proBanner != null) {
-                    proBanner.visibility = View.VISIBLE
-                } else {
-                    Logger.w("MainActivity", "pro_banner view not found in error handler")
-                }
-            }
-        }
-    }
 
     @SuppressLint("SetTextI18n")
     private fun updateUI() {
@@ -566,144 +447,6 @@ class MainActivity : BaseNavigationActivity() {
     private fun updateDefaultAssistantButtonVisibility() {
         val btn = findViewById<TextView>(R.id.btn_set_default_assistant)
         btn.visibility = if (isThisAppDefaultAssistant()) View.GONE else View.VISIBLE
-    }
-
-    private fun showLoading(show: Boolean) {
-        loadingOverlay.visibility = if (show) View.VISIBLE else View.GONE
-    }
-
-    private fun performBillingCheck() {
-        lifecycleScope.launch {
-            try {
-                waitForBillingClientReady()
-                queryAndHandlePurchases()
-                updateTaskCounter()
-                updateBillingStatus()
-                
-            } catch (e: Exception) {
-                Logger.e("MainActivity", "Error during billing check", e)
-                updateTaskCounter()
-                updateBillingStatus()
-            } finally {
-                showLoading(false)
-            }
-        }
-    }
-
-    private suspend fun waitForBillingClientReady() {
-        return withContext(Dispatchers.IO) {
-            var attempts = 0
-            val maxAttempts = 10
-            
-            while (!MyApplication.isBillingClientReady.value && attempts < maxAttempts) {
-                kotlinx.coroutines.delay(500)
-                attempts++
-            }
-            
-            if (!MyApplication.isBillingClientReady.value) {
-                Logger.w("MainActivity", "Billing client not ready after waiting")
-            }
-        }
-    }
-
-    private suspend fun queryAndHandlePurchases() {
-        return withContext(Dispatchers.IO) {
-            if (!MyApplication.isBillingClientReady.value) {
-                Logger.e("MainActivity", "queryPurchases: BillingClient is not ready")
-                return@withContext
-            }
-
-            try {
-                val params = QueryPurchasesParams.newBuilder()
-                    .setProductType(BillingClient.ProductType.SUBS)
-                    .build()
-                
-                Logger.d("MainActivity", "queryPurchases: BillingClient is ready")
-
-                val purchasesResult = MyApplication.billingClient.queryPurchasesAsync(params)
-                val billingResult = purchasesResult.billingResult
-                
-                Logger.d("MainActivity", "queryPurchases: Got billing result: ${billingResult.responseCode}")
-
-                if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                    Logger.d("MainActivity", "queryPurchases: Found ${purchasesResult.purchasesList.size} purchases")
-                    purchasesResult.purchasesList.forEach { purchase ->
-                        when (purchase.purchaseState) {
-                            Purchase.PurchaseState.PURCHASED -> {
-                                Logger.d("MainActivity", "Found purchased item: ${purchase.products}")
-                                handlePurchase(purchase)
-                            }
-                            Purchase.PurchaseState.PENDING -> {
-                                Logger.d("MainActivity", "Purchase is pending")
-                            }
-                            else -> {
-                                Logger.d("MainActivity", "Purchase is not in a valid state: ${purchase.purchaseState}")
-                            }
-                        }
-                    }
-                } else {
-                    Logger.e("MainActivity", "Failed to query purchases: ${billingResult.debugMessage}")
-                }
-            } catch (e: Exception) {
-                Logger.e("MainActivity", "Exception during purchase query", e)
-            }
-        }
-    }
-
-    private suspend fun handlePurchase(purchase: Purchase) {
-        return withContext(Dispatchers.IO) {
-            try {
-                if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED) {
-                    if (!purchase.isAcknowledged) {
-                        val acknowledgePurchaseParams = AcknowledgePurchaseParams.newBuilder()
-                            .setPurchaseToken(purchase.purchaseToken)
-                            .build()
-                        
-                        MyApplication.billingClient.acknowledgePurchase(acknowledgePurchaseParams) { billingResult ->
-                            if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                                Logger.d("MainActivity", "Purchase acknowledged: ${purchase.orderId}")
-                                lifecycleScope.launch {
-                                    updateUserToPro()
-                                }
-                            } else {
-                                Logger.e("MainActivity", "Failed to acknowledge purchase: ${billingResult.debugMessage}")
-                            }
-                        }
-                    } else {
-                        updateUserToPro()
-                    }
-                }
-            } catch (e: Exception) {
-                Logger.e("MainActivity", "Error handling purchase", e)
-            }
-        }
-    }
-
-
-    private suspend fun updateUserToPro() {
-        val uid = Firebase.auth.currentUser?.uid
-        if (uid == null) {
-            Logger.e("MainActivity", "Cannot update user to pro: user is not authenticated.")
-            withContext(Dispatchers.Main) {
-            }
-            return
-        }
-
-        withContext(Dispatchers.IO) {
-            val db = Firebase.firestore
-            try {
-                val userDocRef = db.collection("users").document(uid)
-                userDocRef.update("plan", "pro").await()
-                Logger.d("MainActivity", "Successfully updated user $uid to 'pro' plan.")
-                withContext(Dispatchers.Main) {
-                }
-
-            } catch (e: Exception) {
-                Logger.e("MainActivity", "Error updating user to pro", e)
-                withContext(Dispatchers.Main) {
-                }
-            }
-        }
     }
 
     private fun displayDeveloperMessage() {

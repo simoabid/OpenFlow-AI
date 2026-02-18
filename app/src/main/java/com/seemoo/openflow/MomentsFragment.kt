@@ -12,7 +12,7 @@ import com.seemoo.openflow.data.TaskHistoryItem
 import com.seemoo.openflow.utilities.Logger
 import com.google.firebase.Firebase
 import com.google.firebase.Timestamp
-import com.google.firebase.auth.auth
+import com.seemoo.openflow.utilities.UserIdManager
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,7 +25,7 @@ class MomentsFragment : Fragment() {
     private lateinit var emptyState: LinearLayout
     private lateinit var adapter: MomentsAdapter
     private val db = Firebase.firestore
-    private val auth = Firebase.auth
+    private lateinit var userIdManager: UserIdManager
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -38,6 +38,7 @@ class MomentsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        userIdManager = UserIdManager(requireContext())
         // Initialize views
         recyclerView = view.findViewById(R.id.task_history_recycler_view)
         emptyState = view.findViewById(R.id.empty_state)
@@ -52,15 +53,11 @@ class MomentsFragment : Fragment() {
     }
 
     private fun loadTaskHistory() {
-        val currentUser = auth.currentUser
-        if (currentUser == null) {
-            showEmptyState()
-            return
-        }
+        val userId = userIdManager.getOrCreateUserId()
 
         CoroutineScope(Dispatchers.Main).launch {
             try {
-                val document = db.collection("users").document(currentUser.uid).get().await()
+                val document = db.collection("users").document(userId).get().await()
                 if (document.exists()) {
                     val taskHistoryData = document.get("taskHistory") as? List<Map<String, Any>>
                     if (taskHistoryData != null && taskHistoryData.isNotEmpty()) {

@@ -19,7 +19,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.seemoo.openflow.data.UserMemory
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.snackbar.Snackbar
-import com.google.firebase.auth.FirebaseAuth
+import com.seemoo.openflow.utilities.UserIdManager
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import java.util.Date
@@ -33,7 +33,7 @@ class MemoriesFragment : Fragment() {
     private lateinit var memoriesAdapter: MemoriesAdapter
 
     private val db = FirebaseFirestore.getInstance()
-    private val auth = FirebaseAuth.getInstance()
+    private lateinit var userIdManager: UserIdManager
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -46,6 +46,7 @@ class MemoriesFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        userIdManager = UserIdManager(requireContext())
         setupViews(view)
         setupRecyclerView()
         loadMemories()
@@ -109,13 +110,9 @@ class MemoriesFragment : Fragment() {
     }
 
     private fun loadMemories() {
-        val user = auth.currentUser
-        if (user == null) {
-            updateUI(emptyList())
-            return
-        }
+        val userId = userIdManager.getOrCreateUserId()
 
-        val docRef = db.collection("users").document(user.uid)
+        val docRef = db.collection("users").document(userId)
         docRef.addSnapshotListener { snapshot, e ->
             if (e != null) {
                 Log.w("MemoriesFragment", "Listen failed.", e)
@@ -209,7 +206,7 @@ class MemoriesFragment : Fragment() {
     }
 
     private fun addMemory(memoryText: String) {
-        val user = auth.currentUser ?: return
+        val userId = userIdManager.getOrCreateUserId()
         val newMemory = UserMemory(
             id = UUID.randomUUID().toString(),
             text = memoryText,
@@ -217,7 +214,7 @@ class MemoriesFragment : Fragment() {
             createdAt = Date()
         )
 
-        val docRef = db.collection("users").document(user.uid)
+        val docRef = db.collection("users").document(userId)
 
         val memoryMap = hashMapOf(
             "id" to newMemory.id,
@@ -237,8 +234,8 @@ class MemoriesFragment : Fragment() {
     }
 
     private fun updateMemory(oldMemory: UserMemory, newText: String) {
-        val user = auth.currentUser ?: return
-        val docRef = db.collection("users").document(user.uid)
+        val userId = userIdManager.getOrCreateUserId()
+        val docRef = db.collection("users").document(userId)
 
         db.runTransaction { transaction ->
             val snapshot = transaction.get(docRef)
@@ -280,8 +277,8 @@ class MemoriesFragment : Fragment() {
     }
 
     private fun deleteMemory(memory: UserMemory) {
-        val user = auth.currentUser ?: return
-        val docRef = db.collection("users").document(user.uid)
+        val userId = userIdManager.getOrCreateUserId()
+        val docRef = db.collection("users").document(userId)
 
         db.runTransaction { transaction ->
             val snapshot = transaction.get(docRef)

@@ -36,7 +36,7 @@ class OpenFlowWidgetProvider : AppWidgetProvider() {
             )
 
             // Get the layout for the App Widget and attach an on-click listener
-            val views = RemoteViews(context.packageName, R.layout.openflow_widget_layout)
+            val views = RemoteViews(context.packageName, R.layout.panda_widget_layout)
             views.setOnClickPendingIntent(R.id.widget_root, pendingIntent)
 
             // Tell the AppWidgetManager to perform an update on the current app widget

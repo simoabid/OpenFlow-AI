@@ -74,7 +74,7 @@ class FloatingOpenFlowButtonService : Service() {
             // Set up the button click listener
             button.setOnClickListener {
                 Log.d(TAG, "Floating OpenFlow-AI button clicked!")
-                triggerOpenFlow-AIActivation()
+                triggerOpenFlowAIActivation()
             }
 
             val displayMetrics = resources.displayMetrics
@@ -114,7 +114,7 @@ class FloatingOpenFlowButtonService : Service() {
             isAllCaps = false
             setTextColor(Color.WHITE)
             // Use the new pill-shaped background
-            background = ContextCompat.getDrawable(context, R.drawable.floating_openflow_text_background)
+            background = ContextCompat.getDrawable(context, R.drawable.floating_panda_text_background)
 
             // Add elevation for a floating shadow effect
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -126,7 +126,7 @@ class FloatingOpenFlowButtonService : Service() {
     }
 
 
-    private fun triggerOpenFlow-AIActivation() {
+    private fun triggerOpenFlowAIActivation() {
         try {
             if (!ConversationalAgentService.isRunning) {
                 Log.d(TAG, "Starting ConversationalAgentService from floating button")

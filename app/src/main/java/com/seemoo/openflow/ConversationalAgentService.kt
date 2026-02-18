@@ -39,7 +39,7 @@ import com.seemoo.openflow.utilities.FreemiumManager
 import com.seemoo.openflow.overlay.OverlayManager
 import com.seemoo.openflow.overlay.OverlayDispatcher
 import com.seemoo.openflow.utilities.OpenFlowState
-import com.seemoo.openflow.utilities.UserProfileManager
+import com.seemoo.openflow.utilities.UserIdManager
 import com.seemoo.openflow.utilities.VisualFeedbackManager
 import com.seemoo.openflow.v2.AgentService
 import com.seemoo.openflow.data.UserMemory
@@ -48,10 +48,10 @@ import com.google.firebase.Firebase
 import com.google.firebase.Timestamp
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.analytics.analytics
-import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FieldValue
 import com.seemoo.openflow.utilities.ServicePermissionManager
 import com.seemoo.openflow.utilities.OpenFlowStateManager
+import com.seemoo.openflow.utilities.UserProfileManager
 import com.seemoo.openflow.v2.perception.Perception
 import com.seemoo.openflow.v2.perception.SemanticParser
 import com.google.firebase.firestore.firestore
@@ -92,7 +92,7 @@ class ConversationalAgentService : Service() {
     private val visualFeedbackManager by lazy { VisualFeedbackManager.getInstance(this) }
     private val openflowStateManager by lazy { OpenFlowStateManager.getInstance(this) }
     private var isTextModeActive = false
-    private val freemiumManager by lazy { FreemiumManager() }
+    private val freemiumManager by lazy { FreemiumManager(this) }
     private val servicePermissionManager by lazy { ServicePermissionManager(this) }
 
     private var clarificationAttempts = 0
@@ -112,7 +112,6 @@ class ConversationalAgentService : Service() {
     
     // Firebase instances for conversation tracking
     private val db = Firebase.firestore
-    private val auth = Firebase.auth
     private var conversationId: String? = null // Track current conversation session
 
 
@@ -1188,14 +1187,12 @@ class ConversationalAgentService : Service() {
      * This method is inspired by AgentService's Firebase operations.
      */
     private fun trackConversationStart() {
-        val currentUser = auth.currentUser
-        if (currentUser == null) {
-            Log.w("ConvAgent", "Cannot track conversation, user is not logged in.")
-            return
-        }
+        // Get user ID from local preference instead of Firebase Auth
+        val userIdManager = UserIdManager(applicationContext)
+        val uid = userIdManager.getOrCreateUserId()
 
         // Generate a unique conversation ID
-        conversationId = "${System.currentTimeMillis()}_${currentUser.uid.take(8)}"
+        conversationId = "${System.currentTimeMillis()}_${uid.take(8)}"
 
         serviceScope.launch {
             try {
@@ -1213,11 +1210,11 @@ class ConversationalAgentService : Service() {
                 )
 
                 // Append the conversation to the user's conversationHistory array
-                db.collection("users").document(currentUser.uid)
+                db.collection("users").document(uid)
                     .update("conversationHistory", FieldValue.arrayUnion(conversationEntry))
                     .await()
 
-                Log.d("ConvAgent", "Successfully tracked conversation start in Firebase for user ${currentUser.uid}: $conversationId")
+                Log.d("ConvAgent", "Successfully tracked conversation start in Firebase for user $uid: $conversationId")
             } catch (e: Exception) {
                 Log.e("ConvAgent", "Failed to track conversation start in Firebase", e)
                 // Don't fail the conversation if Firebase tracking fails
@@ -1230,8 +1227,11 @@ class ConversationalAgentService : Service() {
      * Fire and forget operation.
      */
     private fun trackMessage(role: String, message: String, messageType: String = "text") {
-        val currentUser = auth.currentUser
-        if (currentUser == null || conversationId == null) {
+        // Get user ID from local preference
+        val userIdManager = UserIdManager(applicationContext)
+        val uid = userIdManager.getOrCreateUserId()
+        
+        if (conversationId == null) {
             return
         }
 
@@ -1246,8 +1246,12 @@ class ConversationalAgentService : Service() {
                     "inputMode" to if (isTextModeActive) "text" else "voice"
                 )
 
+                // Get user ID from local preference
+                val userIdManager = UserIdManager(applicationContext)
+                val uid = userIdManager.getOrCreateUserId()
+                
                 // Append the message to the user's messageHistory array
-                db.collection("users").document(currentUser.uid)
+                db.collection("users").document(uid)
                     .update("messageHistory", FieldValue.arrayUnion(messageEntry))
                     .await()
 
@@ -1263,8 +1267,11 @@ class ConversationalAgentService : Service() {
      * Fire and forget operation.
      */
     private fun trackConversationEnd(endReason: String, tasksRequested: Int = 0, tasksExecuted: Int = 0) {
-        val currentUser = auth.currentUser
-        if (currentUser == null || conversationId == null) {
+        // Get user ID from local preference
+        val userIdManager = UserIdManager(applicationContext)
+        val uid = userIdManager.getOrCreateUserId()
+        
+        if (conversationId == null) {
             return
         }
 
@@ -1283,8 +1290,12 @@ class ConversationalAgentService : Service() {
                     "status" to "completed"
                 )
 
+                // Get user ID from local preference
+                val userIdManager = UserIdManager(applicationContext)
+                val uid = userIdManager.getOrCreateUserId()
+                
                 // Append the completion status to the user's conversationHistory array
-                db.collection("users").document(currentUser.uid)
+                db.collection("users").document(uid)
                     .update("conversationHistory", FieldValue.arrayUnion(completionEntry))
                     .await()
 
@@ -1326,14 +1337,11 @@ class ConversationalAgentService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun fetchMemories() {
-        val currentUser = auth.currentUser
-        if (currentUser == null) {
-            Log.w("ConvAgent", "User not logged in, cannot fetch memories")
-            return
-        }
-
-        Log.d("ConvAgent", "Starting async memory fetch for user: ${currentUser.uid}")
-        db.collection("users").document(currentUser.uid)
+        // Get user ID from local preference
+        val userIdManager = UserIdManager(applicationContext)
+        val uid = userIdManager.getOrCreateUserId()
+        Log.d("ConvAgent", "Starting async memory fetch for user: $uid")
+        db.collection("users").document(uid)
             .addSnapshotListener { snapshot, e ->
                 if (e != null) {
                     Log.w("ConvAgent", "Listen failed.", e)
@@ -1369,18 +1377,14 @@ class ConversationalAgentService : Service() {
     }
 
     private fun triggerMemoryGeneration() {
-        val currentUser = auth.currentUser
-        val userEmail = currentUser?.email
+        // Get user ID from local preference instead of email
+        val userIdManager = UserIdManager(applicationContext)
+        val uid = userIdManager.getOrCreateUserId()
 
-        if (userEmail == null) {
-            Log.w("ConvAgent", "User email not found, cannot trigger memory generation")
-            return
-        }
-
-        Log.d("ConvAgent", "Triggering memory generation for email: $userEmail")
+        Log.d("ConvAgent", "Triggering memory generation for user: $uid")
 
         val json = JSONObject()
-        json.put("email", userEmail)
+        json.put("userId", uid)
 
         val requestBody = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
 

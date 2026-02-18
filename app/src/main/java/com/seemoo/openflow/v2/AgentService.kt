@@ -103,7 +103,7 @@ class AgentService : Service() {
             try {
                 kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                     try {
-                        com.seemoo.openflow.utilities.FreemiumManager().decrementTaskCount()
+                        com.seemoo.openflow.utilities.FreemiumManager(context).decrementTaskCount()
                     } catch (_: Exception) {
                     }
                 }

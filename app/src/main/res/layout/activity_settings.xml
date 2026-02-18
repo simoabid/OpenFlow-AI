@@ -203,70 +203,6 @@
 
         </LinearLayout>
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:background="@drawable/rounded_background"
-            android:orientation="vertical"
-            android:padding="16dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Profile"
-                android:textColor="@color/white"
-                android:textSize="18sp"
-                android:fontFamily="@font/playfair_display"
-                android:textStyle="bold" />
-
-            <EditText
-                android:id="@+id/editUserName"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:fontFamily="@font/oxanium"
-                android:enabled="false"
-                android:background="@drawable/rounded_background"
-                android:hint="Your name"
-                android:inputType="textPersonName"
-                android:padding="12dp"
-                android:textColor="#CECECE"
-                android:textColorHint="#888888" />
-
-            <EditText
-                android:id="@+id/editUserEmail"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:background="@drawable/rounded_background"
-                android:hint="Your email"
-                android:inputType="textEmailAddress"
-                android:padding="12dp"
-                android:enabled="false"
-                android:textColor="#CECECE"
-                android:textColorHint="#888888" />
-
-            <TextView
-                android:id="@+id/textProfileDisclaimer"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="This email will not be verified or stored by us. Please enter an accurate email so we don’t have to spend money to onboard you. We treat different emails as different users."
-                android:textColor="#888888"
-                android:textSize="12sp" />
-
-<!--            <Button-->
-<!--                android:id="@+id/buttonSaveProfile"-->
-<!--                android:layout_width="match_parent"-->
-<!--                android:layout_height="wrap_content"-->
-<!--                android:layout_marginTop="12dp"-->
-<!--                android:background="@drawable/btn_with_border"-->
-<!--                android:text="Save Profile"-->
-<!--                android:textColor="@android:color/white" />-->
-
-        </LinearLayout>
-
         <TextView
             android:id="@+id/permissionsInfoButton"
             android:layout_width="wrap_content"
@@ -282,15 +218,7 @@
             android:textColor="@color/accent"
             android:textSize="16sp"
             android:textStyle="bold" />
-            <Button
-                android:id="@+id/buttonSignOut"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center_horizontal"
-                android:layout_marginTop="24dp"
-                android:background="@drawable/btn_with_border"
-                android:text="@string/sign_out"
-                android:textColor="@android:color/white" />
+            
             <TextView
               android:id="@+id/appVersionText"
               android:layout_width="wrap_content"

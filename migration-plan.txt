@@ -1,0 +1,2266 @@
+================================================================================
+        OPENFLOW-AI: KOTLIN ANDROID TO REACT NATIVE EXPO MIGRATION PLAN
+================================================================================
+Created: February 13, 2026
+Estimated Duration: 6-12 months (team of 3-5 developers)
+Complexity: VERY HIGH
+Risk Level: HIGH
+================================================================================
+
+TABLE OF CONTENTS
+1. Executive Summary
+2. Feasibility Analysis & Critical Blockers
+3. Architecture Transformation Strategy
+4. Phase-by-Phase Migration Plan
+5. Technology Stack Mapping
+6. Component Migration Map
+7. Native Module Requirements
+8. API & Service Integration
+9. Testing Strategy
+10. Risk Mitigation
+11. Alternative Approaches
+12. Detailed Implementation Steps
+13. Resource Requirements
+14. Success Criteria
+
+================================================================================
+1. EXECUTIVE SUMMARY
+================================================================================
+
+MIGRATION GOAL:
+Transform OpenFlow-AI from a native Kotlin Android app to a cross-platform
+React Native Expo application while maintaining core functionality.
+
+FEASIBILITY: POSSIBLE BUT EXTREMELY CHALLENGING ⚠️
+
+Key Points:
+✅ POSSIBLE: UI layer, business logic, API integrations, voice features
+⚠️ CHALLENGING: Background services, accessibility features, screen automation
+❌ IMPOSSIBLE (without native modules): Android Accessibility Service equivalent
+
+RECOMMENDED APPROACH: Hybrid Migration
+- React Native Expo for UI, business logic, and most features
+- Custom Native Modules for accessibility and screen automation (Android/iOS)
+- Gradual migration (not big-bang rewrite)
+
+CRITICAL DECISION POINT:
+The app's core feature (autonomous UI automation via Accessibility Service) has
+NO direct React Native equivalent. This requires custom native modules, which
+defeats some benefits of React Native and is NOT supported in managed Expo.
+
+================================================================================
+2. FEASIBILITY ANALYSIS & CRITICAL BLOCKERS
+================================================================================
+
+2.1 COMPLETE BLOCKERS (Managed Expo)
+-------------------------------------
+❌ Android Accessibility Service:
+   - Core feature for screen reading and UI automation
+   - NO React Native equivalent exists
+   - Requires native Android code
+   - NOT available in managed Expo
+   - Solution: Must use Expo bare workflow or custom dev client
+
+❌ Foreground Services with Custom Actions:
+   - Required for always-on agent execution
+   - Limited support in React Native
+   - Expo has restrictions
+   - Solution: Native modules required
+
+❌ System-Level Gesture Control:
+   - Automated taps, swipes outside app
+   - Not possible in React Native sandbox
+   - Solution: Native modules required
+
+❌ Advanced Permissions:
+   - QUERY_ALL_PACKAGES: Not accessible from React Native
+   - BIND_ACCESSIBILITY_SERVICE: Requires native setup
+   - Solution: Native permission handling
+
+2.2 SIGNIFICANT CHALLENGES (Solvable)
+--------------------------------------
+⚠️ Background Task Execution:
+   - React Native has limitations
+   - Solutions: react-native-background-actions, TaskManager (Expo)
+   - Trade-offs: Less reliable than native
+
+⚠️ Screen Capture:
+   - Limited React Native APIs
+   - Solutions: react-native-view-shot (in-app only), native modules for system
+   - Trade-offs: May need native code
+
+⚠️ Complex State Management:
+   - Agent loop with persistent state
+   - Solutions: Redux, MobX, Zustand with AsyncStorage
+   - Trade-offs: More complex than Kotlin coroutines
+
+⚠️ Performance:
+   - JavaScript slower than Kotlin for intensive operations
+   - Solutions: Native modules for critical paths, Hermes engine
+   - Trade-offs: May need optimization work
+
+2.3 EASILY MIGRATABLE
+----------------------
+✅ Voice Features (TTS/STT):
+   - expo-speech, expo-speech-recognition
+   - react-native-voice (for advanced STT)
+
+✅ Wake Word Detection:
+   - @picovoice/react-native-porcupine available
+
+✅ Firebase Integration:
+   - @react-native-firebase/* packages
+   - Full feature parity
+
+✅ UI Components:
+   - React Native components
+   - react-native-paper (Material Design)
+
+✅ API Integrations:
+   - Axios or Fetch for HTTP calls
+   - Same APIs work
+
+✅ Navigation:
+   - React Navigation
+   - Similar to Android activities
+
+✅ Local Storage:
+   - AsyncStorage, SQLite, Realm
+   - Good alternatives to Room
+
+2.4 FINAL VERDICT
+-----------------
+MIGRATION IS POSSIBLE IF:
+1. You accept using Expo Bare Workflow or custom dev client (not managed Expo)
+2. You invest in building custom native modules for accessibility features
+3. You're prepared for significant development effort (6-12 months)
+4. You accept some feature compromises or platform-specific code
+
+RECOMMENDED: Stay with Native Android OR use Flutter (better native access)
+
+IF PROCEEDING: Follow hybrid approach with extensive native modules
+
+================================================================================
+3. ARCHITECTURE TRANSFORMATION STRATEGY
+================================================================================
+
+3.1 CURRENT ARCHITECTURE (Kotlin/Android)
+------------------------------------------
+```
+Android App (Kotlin)
+├── Accessibility Service (Native Android)
+│   ├── Screen Reading
+│   ├── UI Element Detection
+│   └── Gesture Execution
+├── Agent Service (Foreground Service)
+│   ├── Agent Loop (SENSE → THINK → ACT)
+│   ├── LLM Integration (Gemini)
+│   └── Action Executor
+├── UI Layer (Compose + Activities)
+├── Voice (TTS/STT - Android APIs)
+├── Wake Word (Picovoice)
+├── Background Services
+│   ├── Wake Word Service
+│   ├── Trigger Monitoring
+│   └── Notification Listener
+└── Data Layer (Room + SharedPreferences)
+```
+
+3.2 TARGET ARCHITECTURE (React Native Expo)
+--------------------------------------------
+```
+Expo App (TypeScript + React Native)
+├── Native Modules (Custom - Bridge to Android/iOS)
+│   ├── AccessibilityModule (Android)
+│   │   ├── Screen Capture
+│   │   ├── UI Tree Extraction
+│   │   └── Gesture Dispatch
+│   ├── ScreenAutomationModule (iOS - limited)
+│   └── BackgroundServiceModule
+│       ├── Agent Execution
+│       └── Trigger Monitoring
+├── React Native App Layer
+│   ├── Agent Core (TypeScript)
+│   │   ├── Agent Loop
+│   │   ├── State Management (Redux/Zustand)
+│   │   ├── LLM Client (Gemini)
+│   │   └── Action Coordinator
+│   ├── UI Layer (React Native + Expo)
+│   │   ├── Screens (React Navigation)
+│   │   ├── Components (React Native Paper)
+│   │   └── Styling (StyleSheet/Tailwind)
+│   ├── Voice Layer (Expo + RN Libraries)
+│   │   ├── TTS (expo-speech)
+│   │   ├── STT (expo-speech-recognition)
+│   │   └── Wake Word (@picovoice/react-native-porcupine)
+│   ├── Services Layer
+│   │   ├── Background Tasks (expo-task-manager)
+│   │   ├── Notifications (expo-notifications)
+│   │   └── Triggers (local scheduling)
+│   └── Data Layer
+│       ├── AsyncStorage (simple data)
+│       ├── SQLite (structured data)
+│       └── FileSystem (expo-file-system)
+└── Firebase Integration (@react-native-firebase)
+    ├── Auth
+    ├── Firestore
+    ├── Analytics
+    └── Crashlytics
+```
+
+3.3 KEY ARCHITECTURAL CHANGES
+------------------------------
+1. **Language Shift**:
+   - Kotlin → TypeScript (strongly typed JavaScript)
+   - Coroutines → async/await Promises
+   - Sealed Classes → TypeScript Union Types
+
+2. **UI Paradigm**:
+   - Jetpack Compose → React Native JSX
+   - Activities/Fragments → React Navigation Screens
+   - ViewBinding → React State & Props
+
+3. **State Management**:
+   - Room + ViewModel → Redux/Zustand + AsyncStorage
+   - LiveData → React State/Context
+   - SharedPreferences → AsyncStorage
+
+4. **Concurrency**:
+   - Kotlin Coroutines → async/await + Promise.all
+   - Channel → EventEmitter or RxJS
+   - Flow → RxJS or custom observables
+
+5. **Native Bridge**:
+   - Direct Android APIs → Native Modules → JavaScript Bridge
+   - Performance overhead from serialization
+
+3.4 ARCHITECTURE DECISION RECORDS
+----------------------------------
+ADR-001: Use Expo Bare Workflow
+- Reason: Need custom native modules for accessibility
+- Trade-off: Lose managed Expo convenience
+
+ADR-002: TypeScript over JavaScript
+- Reason: Type safety critical for large codebase
+- Trade-off: Additional build complexity
+
+ADR-003: Redux Toolkit for State
+- Reason: Complex agent state needs robust solution
+- Trade-off: Learning curve, boilerplate
+
+ADR-004: Native Modules for Core Features
+- Reason: Accessibility and automation require native code
+- Trade-off: Platform-specific maintenance
+
+ADR-005: React Navigation v6
+- Reason: Industry standard, well-maintained
+- Trade-off: Different patterns from Android Navigation
+
+================================================================================
+4. PHASE-BY-PHASE MIGRATION PLAN
+================================================================================
+
+STRATEGY: Strangler Fig Pattern (Gradual Replacement)
+Not recommended for big-bang rewrite. Consider parallel development.
+
+PHASE 0: PREPARATION (4-6 weeks)
+---------------------------------
+Week 1-2: Analysis & Planning
+□ Audit entire codebase (done via summary.txt)
+□ Identify all dependencies
+□ Map all Android-specific features
+□ Create detailed component inventory
+□ Assess team React Native expertise
+□ Set up development environments
+
+Week 3-4: Proof of Concept
+□ Build React Native prototype
+□ Test critical native module (accessibility proof)
+□ Validate Firebase integration
+□ Test voice features (TTS/STT/wake word)
+□ Performance baseline testing
+□ Decision: Go/No-Go
+
+Week 5-6: Project Setup
+□ Initialize Expo bare workflow project
+□ Set up TypeScript configuration
+□ Configure ESLint, Prettier
+□ Set up CI/CD pipelines
+□ Create native module scaffolding (Android/iOS)
+□ Set up development/staging/production environments
+
+PHASE 1: FOUNDATION (8-10 weeks)
+---------------------------------
+Sprint 1-2: Core Infrastructure
+□ Project structure setup
+□ Navigation framework (React Navigation)
+□ State management setup (Redux Toolkit)
+□ API client layer (Axios + interceptors)
+□ Error handling framework
+□ Logging infrastructure
+□ Environment configuration
+□ Build tooling
+
+Sprint 3-4: Native Modules - Foundation
+□ Android Accessibility Service bridge
+  - Screen capture module
+  - UI tree extraction module
+  - Gesture execution module
+□ iOS equivalent (limited functionality)
+□ Module testing framework
+□ Documentation
+
+Sprint 5: Data Layer
+□ AsyncStorage wrapper
+□ SQLite setup (expo-sqlite)
+□ File system manager (expo-file-system)
+□ Data migration utilities
+□ Offline-first architecture
+
+PHASE 2: CORE FEATURES (12-16 weeks)
+-------------------------------------
+Sprint 6-7: Agent Core Logic
+□ Port Agent.kt to TypeScript
+  - Agent state machine
+  - SENSE → THINK → ACT loop
+  - Step management
+  - History tracking
+□ Port PromptBuilder
+  - System prompt integration
+  - Dynamic prompt construction
+□ Port MemoryManager
+  - Short-term memory
+  - Message management
+
+Sprint 8-9: LLM Integration
+□ Port GeminiAPI to TypeScript
+  - API client with retry logic
+  - Key rotation system
+  - Proxy and direct mode
+  - Response parsing
+□ Port action system
+  - Action definitions (TypeScript types)
+  - Action serializer/deserializer
+  - Action executor framework
+
+Sprint 10-11: Perception & Actions
+□ Port Perception system
+  - Screen state analyzer
+  - Element parser
+  - Screenshot handling
+□ Port Action Executor
+  - Bridge to native gesture modules
+  - File operations
+  - App launching
+  - Web search integration
+
+Sprint 12-13: Voice Features
+□ TTS implementation (expo-speech + Google Cloud TTS)
+  - Multi-voice support
+  - Audio caching
+  - Queue management
+□ STT implementation (expo-speech-recognition)
+  - Press-and-hold interface
+  - Continuous listening
+□ Speech coordinator
+  - STT/TTS coordination
+  - Thread safety
+
+Sprint 14-15: Wake Word System
+□ Picovoice integration (@picovoice/react-native-porcupine)
+  - Wake word detection
+  - Background listening
+  - Battery optimization
+□ Wake word service
+  - Foreground service (native module)
+  - Notification management
+
+Sprint 16: Background Services
+□ Background task framework
+  - expo-task-manager integration
+  - Native background service module
+□ Agent service port
+  - Long-running agent execution
+  - Task queue management
+
+PHASE 3: USER INTERFACE (10-12 weeks)
+--------------------------------------
+Sprint 17-18: Core Screens
+□ Login/Auth screen
+  - Firebase Auth integration
+  - Google OAuth
+  - Email/password
+□ Main screen
+  - Voice input interface
+  - Task status display
+  - Navigation
+□ Settings screen
+  - Preferences
+  - Account management
+
+Sprint 19-20: Feature Screens
+□ Chat/Dialogue screens
+  - Conversation UI
+  - Message bubbles
+  - Input methods
+□ Clarification dialogue
+  - Question flow
+  - Progress indicator
+  - Voice/text input
+
+Sprint 21-22: Management Screens
+□ Triggers screen
+  - Trigger list
+  - Create/edit/delete
+  - Type-specific UI
+□ Moments/History screen
+  - Task history
+  - Details view
+□ Memories screen (if re-enabling)
+
+Sprint 23-24: Additional Screens & Polish
+□ Onboarding flow
+  - Permission screens
+  - Setup wizard
+□ Pro/Subscription screen
+  - Purchase flow
+  - Subscription management
+□ UI Polish
+  - Animations
+  - Dark mode
+  - Accessibility (ironic!)
+
+PHASE 4: INTEGRATION & FEATURES (8-10 weeks)
+---------------------------------------------
+Sprint 25-26: Trigger System
+□ Trigger manager
+  - CRUD operations
+  - Persistence
+□ Scheduled triggers
+  - Alarm scheduling (expo-notifications)
+  - Recurrence logic
+□ Notification triggers
+  - Notification listener (native module)
+  - Matching logic
+□ Charging triggers
+
+Sprint 27-28: Firebase Integration
+□ Authentication
+  - OAuth flows
+  - Session management
+□ Firestore
+  - Data sync
+  - Offline support
+□ Analytics & Crashlytics
+  - Event tracking
+  - Error reporting
+□ Remote Config
+  - Feature flags
+
+Sprint 29-30: Additional Features
+□ Overlay system (native modules)
+  - Toast notifications
+  - Floating UI elements
+□ Visual feedback
+  - Audio wave visualization
+  - Status indicators
+□ File system operations
+  - todo.md management
+  - results.md management
+
+PHASE 5: TESTING & OPTIMIZATION (8-12 weeks)
+---------------------------------------------
+Sprint 31-33: Testing
+□ Unit tests (Jest)
+  - Business logic
+  - Utilities
+  - State management
+□ Integration tests
+  - API integrations
+  - Native modules
+□ E2E tests (Detox)
+  - Critical user flows
+  - Voice interaction
+□ Manual testing
+  - All features
+  - Platform-specific testing
+
+Sprint 34-36: Optimization
+□ Performance optimization
+  - React Native profiling
+  - Native module optimization
+  - Memory management
+□ Bundle size optimization
+  - Code splitting
+  - Tree shaking
+  - Asset optimization
+□ Battery optimization
+  - Background task tuning
+  - Wake lock management
+
+Sprint 37-38: Polish & Bug Fixes
+□ Bug triage and fixing
+□ UX improvements
+□ Accessibility improvements
+□ Documentation updates
+
+PHASE 6: DEPLOYMENT (4-6 weeks)
+--------------------------------
+Sprint 39-40: Pre-Launch
+□ Production build setup
+  - Code signing (Android/iOS)
+  - Release channels
+□ App store preparation
+  - Screenshots
+  - Descriptions
+  - Privacy policy
+□ Beta testing
+  - TestFlight (iOS)
+  - Internal testing (Android)
+
+Sprint 41-42: Launch
+□ Staged rollout
+  - 10% → 50% → 100%
+□ Monitoring
+  - Crashlytics
+  - Performance monitoring
+  - User feedback
+□ Post-launch support
+  - Bug fixes
+  - User support
+
+TOTAL TIMELINE: 54-72 weeks (13-18 months)
+This is conservative. Could be faster with larger team or reduced scope.
+
+================================================================================
+5. TECHNOLOGY STACK MAPPING
+================================================================================
+
+5.1 DEVELOPMENT FRAMEWORK
+--------------------------
+Kotlin/Android → React Native with Expo
+
+Current:
+• Android SDK 24-35
+• Kotlin 2.0.21
+• Jetpack Compose
+• Android Gradle Plugin 8.9.2
+
+Target:
+• React Native 0.73+
+• Expo SDK 50+
+• TypeScript 5.3+
+• Metro bundler
+
+5.2 LANGUAGE
+------------
+Kotlin → TypeScript
+
+Migration Notes:
+• Sealed classes → Discriminated unions
+• Data classes → TypeScript interfaces/types
+• Extension functions → Utility functions
+• Coroutines → async/await
+• Flow → RxJS or custom observables
+
+5.3 UI FRAMEWORK
+----------------
+Jetpack Compose → React Native
+
+Components:
+• Compose UI → React Native core components
+• Material3 → react-native-paper
+• Navigation Component → React Navigation
+• ViewModel → React hooks (useState, useReducer)
+
+5.4 STATE MANAGEMENT
+--------------------
+Room + ViewModel + LiveData → Redux Toolkit + AsyncStorage
+
+Current:
+• Room Database
+• ViewModel
+• LiveData
+• StateFlow
+
+Target:
+• Redux Toolkit (complex state)
+• Zustand (simpler alternative)
+• React Context (global state)
+• AsyncStorage (persistence)
+• expo-sqlite (structured data)
+
+5.5 NETWORKING
+--------------
+OkHttp → Axios or Fetch
+
+Current:
+• OkHttp 5.0.0-alpha.16
+• Moshi for JSON
+
+Target:
+• Axios (recommended)
+• Native Fetch API (alternative)
+• Built-in JSON parsing
+
+5.6 FIREBASE
+------------
+Firebase Android SDK → React Native Firebase
+
+Current:
+• Firebase BOM 34.3.0
+• Native Android SDK
+
+Target:
+• @react-native-firebase/app
+• @react-native-firebase/auth
+• @react-native-firebase/firestore
+• @react-native-firebase/analytics
+• @react-native-firebase/crashlytics
+• @react-native-firebase/remote-config
+
+5.7 VOICE FEATURES
+------------------
+Android TTS/STT → Expo + React Native Voice
+
+TTS:
+• expo-speech (basic)
+• Custom Google Cloud TTS (keep existing)
+• Audio playback: expo-av
+
+STT:
+• expo-speech-recognition (new Expo module)
+• react-native-voice (alternative)
+• @react-native-community/voice (another option)
+
+Wake Word:
+• @picovoice/react-native-porcupine ✓ (Available!)
+
+5.8 PERMISSIONS
+---------------
+Android Permissions → expo-permissions + native modules
+
+Basic:
+• expo-permissions
+• expo-location
+• expo-contacts
+• expo-notifications
+
+Advanced (native modules):
+• Accessibility Service
+• Notification Listener
+• Draw Over Apps
+
+5.9 BACKGROUND TASKS
+--------------------
+Android Services → expo-task-manager + native modules
+
+Current:
+• Foreground Services
+• Background Services
+• WorkManager
+
+Target:
+• expo-task-manager
+• expo-background-fetch
+• Custom native background service module
+
+5.10 LOCAL STORAGE
+------------------
+Room + SharedPreferences → AsyncStorage + SQLite
+
+Current:
+• Room Database
+• SharedPreferences
+• File system
+
+Target:
+• @react-native-async-storage/async-storage
+• expo-sqlite
+• expo-file-system
+• react-native-mmkv (high-performance alternative)
+
+5.11 ANIMATIONS
+---------------
+Android Animations → React Native Animated
+
+Current:
+• Property Animation
+• Compose animations
+
+Target:
+• React Native Animated API
+• react-native-reanimated (better performance)
+• Lottie (lottie-react-native)
+
+5.12 TESTING
+------------
+JUnit + Espresso → Jest + Detox
+
+Current:
+• JUnit 4.13.2
+• Espresso 3.6.1
+• AndroidX Test
+
+Target:
+• Jest (unit tests)
+• React Native Testing Library
+• Detox (E2E tests)
+• @testing-library/react-native
+
+5.13 BUILD & DEPLOYMENT
+-----------------------
+Gradle → Metro + EAS Build
+
+Current:
+• Gradle
+• Android Studio
+• Play Store Console
+
+Target:
+• Metro bundler
+• EAS Build (Expo Application Services)
+• EAS Submit
+• App Store Connect (iOS)
+• Play Store Console (Android)
+
+================================================================================
+6. COMPONENT MIGRATION MAP
+================================================================================
+
+6.1 AGENT CORE
+--------------
+| Kotlin File | React Native/TypeScript Equivalent |
+|-------------|-----------------------------------|
+| v2/Agent.kt | src/agent/Agent.ts |
+| v2/AgentModel.kt | src/agent/types.ts |
+| v2/AgentService.kt | src/services/AgentService.ts + native module |
+| v2/PromptBuilder.kt | src/agent/PromptBuilder.ts |
+| v2/message_manager/MemoryManager.kt | src/agent/MemoryManager.ts |
+| v2/perception/Perception.kt | src/agent/Perception.ts |
+| v2/perception/SemanticParser.kt | src/agent/SemanticParser.ts |
+| v2/actions/Action.kt | src/agent/actions/types.ts |
+| v2/actions/ActionExecutor.kt | src/agent/actions/ActionExecutor.ts |
+| v2/fs/FileSystem.kt | src/services/FileSystem.ts |
+| v2/llm/GeminiAPI.kt | src/api/GeminiClient.ts |
+| v2/llm/models.kt | src/api/types.ts |
+| v2/logging/TaskLogger.kt | src/utils/TaskLogger.ts |
+
+6.2 API INTEGRATIONS
+--------------------
+| Kotlin File | React Native/TypeScript Equivalent |
+|-------------|-----------------------------------|
+| api/GeminiApi.kt | src/api/GeminiClient.ts |
+| api/Eyes.kt | Native module + src/native/Eyes.ts |
+| api/Finger.kt | Native module + src/native/Gestures.ts |
+| api/GoogleTTS.kt | src/services/TTSService.ts |
+| api/TavilyApi.kt | src/api/TavilyClient.ts |
+| api/MemoryService.kt | src/api/MemoryClient.ts |
+| api/PorcupineWakeWordDetector.kt | src/services/WakeWordService.ts |
+| api/PicovoiceKeyManager.kt | src/services/PicovoiceKeyManager.ts |
+
+6.3 ACTIVITIES → SCREENS
+------------------------
+| Android Activity | React Native Screen |
+|-----------------|---------------------|
+| MainActivity.kt | src/screens/HomeScreen.tsx |
+| LoginActivity.kt | src/screens/LoginScreen.tsx |
+| ChatActivity.kt | src/screens/ChatScreen.tsx |
+| DialogueActivity.kt | src/screens/DialogueScreen.tsx |
+| SettingsActivity.kt | src/screens/SettingsScreen.tsx |
+| PermissionsActivity.kt | src/screens/PermissionsScreen.tsx |
+| OnboardingPermissionsActivity.kt | src/screens/OnboardingScreen.tsx |
+| MemoriesActivity.kt | src/screens/MemoriesScreen.tsx |
+| MomentsActivity.kt | src/screens/MomentsScreen.tsx |
+| ProPurchaseActivity.kt | src/screens/SubscriptionScreen.tsx |
+| triggers/ui/TriggersActivity.kt | src/screens/TriggersScreen.tsx |
+| triggers/ui/CreateTriggerActivity.kt | src/screens/CreateTriggerScreen.tsx |
+
+6.4 SERVICES
+------------
+| Android Service | React Native Equivalent |
+|----------------|------------------------|
+| ScreenInteractionService.kt | Native module (Android/iOS) |
+| v2/AgentService.kt | Native background module + JS coordinator |
+| services/EnhancedWakeWordService.kt | Background task + native module |
+| services/FloatingOpenFlowButtonService.kt | Native overlay module |
+| triggers/TriggerMonitoringService.kt | expo-task-manager + scheduler |
+| triggers/OpenFlowNotificationListenerService.kt | Native notification module |
+
+6.5 UTILITIES
+-------------
+| Kotlin File | React Native/TypeScript Equivalent |
+|-------------|-----------------------------------|
+| utilities/TTSManager.kt | src/services/TTSManager.ts |
+| utilities/STTManager.kt | src/services/STTManager.ts |
+| utilities/SpeechCoordinator.kt | src/services/SpeechCoordinator.ts |
+| utilities/ApiKeyManager.kt | src/utils/ApiKeyManager.ts |
+| utilities/FreemiumManager.kt | src/services/SubscriptionManager.ts |
+| utilities/PermissionManager.kt | src/utils/PermissionManager.ts |
+| utilities/OnboardingManager.kt | src/utils/OnboardingManager.ts |
+| utilities/OpenFlowStateManager.kt | src/state/AppStateManager.ts |
+| utilities/Logger.kt | src/utils/Logger.ts |
+| utilities/NetworkConnectivityManager.kt | @react-native-community/netinfo |
+
+6.6 DATA LAYER
+--------------
+| Kotlin/Room | React Native Equivalent |
+|------------|------------------------|
+| data/AppDatabase.kt | src/database/Database.ts (SQLite) |
+| data/Memory.kt | src/models/Memory.ts |
+| data/MemoryDao.kt | src/database/MemoryDao.ts |
+| data/TaskHistoryItem.kt | src/models/TaskHistory.ts |
+| SharedPreferences | AsyncStorage wrapper |
+
+6.7 TRIGGERS
+------------
+| Kotlin File | React Native/TypeScript Equivalent |
+|-------------|-----------------------------------|
+| triggers/Trigger.kt | src/models/Trigger.ts |
+| triggers/TriggerManager.kt | src/services/TriggerManager.ts |
+| triggers/TriggerReceiver.kt | Native module + event handler |
+| triggers/BootReceiver.kt | Native module |
+| triggers/ChargingStateReceiver.kt | expo-battery + event handler |
+
+6.8 OVERLAY SYSTEM
+------------------
+| Kotlin File | React Native Equivalent |
+|-------------|------------------------|
+| overlay/OverlayManager.kt | Native module + src/services/OverlayManager.ts |
+| overlay/OverlayDispatcher.kt | src/services/OverlayDispatcher.ts |
+| overlay/OverlayState.kt | src/state/overlaySlice.ts (Redux) |
+
+6.9 AGENTS
+----------
+| Kotlin File | React Native/TypeScript Equivalent |
+|-------------|-----------------------------------|
+| agents/ClarificationAgent.kt | src/agents/ClarificationAgent.ts |
+
+================================================================================
+7. NATIVE MODULE REQUIREMENTS
+================================================================================
+
+⚠️ CRITICAL: These native modules are ESSENTIAL for app functionality
+
+7.1 ACCESSIBILITY MODULE (Android)
+----------------------------------
+Module: @openflow/accessibility-service
+
+Purpose: Bridge to Android Accessibility Service
+
+Required APIs:
+✓ captureScreen(): Promise<string> - Screenshot as base64
+✓ getScreenHierarchy(): Promise<ScreenNode[]> - UI tree
+✓ tapElement(x: number, y: number): Promise<void>
+✓ longPressElement(x: number, y: number): Promise<void>
+✓ swipe(startX, startY, endX, endY, duration): Promise<void>
+✓ typeText(text: string): Promise<void>
+✓ pressBack(): Promise<void>
+✓ pressHome(): Promise<void>
+✓ openRecents(): Promise<void>
+✓ scrollUp(amount: number): Promise<void>
+✓ scrollDown(amount: number): Promise<void>
+✓ getForegroundApp(): Promise<string> - Package name
+✓ getScreenDimensions(): Promise<{width, height}>
+✓ isKeyboardVisible(): Promise<boolean>
+
+Event Emitters:
+• onWindowStateChanged
+• onScreenChanged
+• onKeyboardVisibilityChanged
+
+Implementation: Full Android Accessibility Service in Java/Kotlin
+
+7.2 SCREEN AUTOMATION MODULE (iOS)
+-----------------------------------
+Module: @openflow/ios-automation
+
+Purpose: Limited iOS screen automation (VERY LIMITED)
+
+Note: iOS has strict sandbox. Cannot automate outside app.
+
+Possible APIs:
+✓ captureInAppScreen(): Promise<string>
+✓ simulateDeepLinks(): Promise<void>
+✗ System-wide automation: NOT POSSIBLE
+
+Alternative: Use XCTest framework for testing only
+
+7.3 BACKGROUND SERVICE MODULE
+------------------------------
+Module: @openflow/background-service
+
+Purpose: Long-running agent execution
+
+Required APIs:
+✓ startForegroundService(title, body): Promise<void>
+✓ stopForegroundService(): Promise<void>
+✓ updateNotification(title, body): Promise<void>
+✓ isServiceRunning(): Promise<boolean>
+
+Events:
+• onServiceStarted
+• onServiceStopped
+• onServiceError
+
+Implementation: Android Service + iOS Background Tasks (limited)
+
+7.4 NOTIFICATION LISTENER MODULE
+---------------------------------
+Module: @openflow/notification-listener
+
+Purpose: Monitor system notifications for triggers
+
+Required APIs:
+✓ requestPermission(): Promise<boolean>
+✓ hasPermission(): Promise<boolean>
+✓ startListening(): Promise<void>
+✓ stopListening(): Promise<void>
+
+Events:
+• onNotificationPosted(app, title, body)
+• onNotificationRemoved(app)
+
+Implementation: NotificationListenerService (Android only)
+
+7.5 OVERLAY MODULE
+------------------
+Module: @openflow/overlay
+
+Purpose: System-wide overlay windows
+
+Required APIs:
+✓ requestOverlayPermission(): Promise<boolean>
+✓ hasOverlayPermission(): Promise<boolean>
+✓ showOverlay(text, duration, position): Promise<void>
+✓ hideOverlay(): Promise<void>
+
+Implementation: WindowManager (Android), limited on iOS
+
+7.6 GESTURE CONTROL MODULE
+---------------------------
+Module: @openflow/gesture-controller
+
+Purpose: Advanced gesture dispatch
+
+Required APIs:
+✓ dispatchGesture(path: GesturePath[]): Promise<void>
+✓ multiPointGesture(paths: GesturePath[][]): Promise<void>
+
+Implementation: AccessibilityService GestureDescription (Android)
+
+7.7 APP LAUNCHER MODULE
+------------------------
+Module: @openflow/app-launcher
+
+Purpose: Launch other apps
+
+Required APIs:
+✓ getInstalledApps(): Promise<AppInfo[]>
+✓ launchApp(packageName: string): Promise<boolean>
+✓ canLaunchApp(packageName): Promise<boolean>
+
+Implementation: PackageManager + Intent (Android), URL schemes (iOS)
+
+7.8 NATIVE MODULE DEVELOPMENT GUIDE
+------------------------------------
+For each module:
+
+1. Create module in Expo bare workflow:
+   ```bash
+   npx create-expo-module @openflow/module-name
+   ```
+
+2. Implement Android side:
+   - Create Java/Kotlin class extending ReactContextBaseJavaModule
+   - Implement native methods with @ReactMethod annotation
+   - Handle permissions and lifecycle
+
+3. Implement iOS side (if possible):
+   - Create Objective-C/Swift class conforming to RCTBridgeModule
+   - Implement native methods with RCT_EXPORT_METHOD
+
+4. Create TypeScript definitions:
+   ```typescript
+   export interface AccessibilityModule {
+     captureScreen(): Promise<string>;
+     // ... more methods
+   }
+   ```
+
+5. Document and test thoroughly
+
+================================================================================
+8. API & SERVICE INTEGRATION
+================================================================================
+
+8.1 GEMINI AI
+-------------
+Migration: Direct port, minimal changes
+
+Current: OkHttp + JSON parsing
+Target: Axios + native JSON
+
+Changes:
+• Replace OkHttp with Axios
+• Keep retry logic
+• Keep key rotation
+• Keep proxy/direct mode logic
+
+Example:
+```typescript
+// src/api/GeminiClient.ts
+import axios from 'axios';
+
+class GeminiClient {
+  async generateContent(messages: Message[]): Promise<AgentOutput> {
+    const response = await axios.post(
+      this.proxyUrl,
+      { modelName: this.model, messages },
+      { 
+        headers: { 'X-API-Key': this.getNextKey() },
+        timeout: 60000 
+      }
+    );
+    return response.data;
+  }
+}
+```
+
+8.2 FIREBASE
+------------
+Migration: Use @react-native-firebase
+
+Setup:
+```bash
+npm install @react-native-firebase/app
+npm install @react-native-firebase/auth
+npm install @react-native-firebase/firestore
+npm install @react-native-firebase/analytics
+npm install @react-native-firebase/crashlytics
+npm install @react-native-firebase/remote-config
+```
+
+Configuration:
+• Add google-services.json (Android)
+• Add GoogleService-Info.plist (iOS)
+• Configure app.json for Expo
+
+Example:
+```typescript
+// src/services/FirebaseService.ts
+import auth from '@react-native-firebase/auth';
+import firestore from '@react-native-firebase/firestore';
+
+class FirebaseService {
+  async signInWithEmail(email: string, password: string) {
+    return await auth().signInWithEmailAndPassword(email, password);
+  }
+  
+  async saveTask(task: Task) {
+    await firestore().collection('tasks').add(task);
+  }
+}
+```
+
+8.3 PICOVOICE (Wake Word)
+--------------------------
+Migration: Use React Native package
+
+Setup:
+```bash
+npm install @picovoice/react-native-porcupine
+```
+
+Example:
+```typescript
+// src/services/WakeWordService.ts
+import { PorcupineManager } from '@picovoice/react-native-porcupine';
+
+class WakeWordService {
+  async start() {
+    this.manager = await PorcupineManager.fromKeywordPaths(
+      'YOUR_ACCESS_KEY',
+      ['path/to/keyword.ppn'],
+      (keywordIndex) => {
+        console.log('Wake word detected!');
+      }
+    );
+    await this.manager.start();
+  }
+}
+```
+
+8.4 GOOGLE CLOUD TTS
+--------------------
+Migration: Keep existing HTTP API calls
+
+No change needed. Continue using HTTP requests.
+
+8.5 TAVILY SEARCH
+-----------------
+Migration: Direct port
+
+Example:
+```typescript
+// src/api/TavilyClient.ts
+import axios from 'axios';
+
+class TavilyClient {
+  async search(query: string) {
+    const response = await axios.post(
+      'https://api.tavily.com/search',
+      { query, api_key: this.apiKey }
+    );
+    return response.data;
+  }
+}
+```
+
+================================================================================
+9. TESTING STRATEGY
+================================================================================
+
+9.1 UNIT TESTING
+----------------
+Framework: Jest
+
+Setup:
+```bash
+npm install --save-dev jest @testing-library/react-native
+```
+
+Test Structure:
+```
+__tests__/
+├── agent/
+│   ├── Agent.test.ts
+│   ├── PromptBuilder.test.ts
+│   └── ActionExecutor.test.ts
+├── services/
+│   ├── TTSManager.test.ts
+│   └── STTManager.test.ts
+├── utils/
+│   └── ApiKeyManager.test.ts
+└── api/
+    └── GeminiClient.test.ts
+```
+
+Example:
+```typescript
+// __tests__/agent/Agent.test.ts
+import { Agent } from '../../src/agent/Agent';
+
+describe('Agent', () => {
+  it('should execute task successfully', async () => {
+    const agent = new Agent(mockConfig);
+    const result = await agent.run('Open Chrome');
+    expect(result.success).toBe(true);
+  });
+});
+```
+
+9.2 INTEGRATION TESTING
+------------------------
+Focus: API integrations, native modules
+
+Example:
+```typescript
+// __tests__/integration/Accessibility.test.ts
+import { AccessibilityModule } from '../../src/native/Accessibility';
+
+describe('Accessibility Module', () => {
+  it('should capture screen', async () => {
+    const base64 = await AccessibilityModule.captureScreen();
+    expect(base64).toBeDefined();
+    expect(base64.length).toBeGreaterThan(0);
+  });
+});
+```
+
+9.3 E2E TESTING
+---------------
+Framework: Detox
+
+Setup:
+```bash
+npm install --save-dev detox
+detox init
+```
+
+Test Structure:
+```
+e2e/
+├── login.e2e.ts
+├── voiceCommand.e2e.ts
+├── triggers.e2e.ts
+└── settings.e2e.ts
+```
+
+Example:
+```typescript
+// e2e/voiceCommand.e2e.ts
+describe('Voice Command', () => {
+  it('should execute voice command', async () => {
+    await element(by.id('mic-button')).tap();
+    // Simulate voice input (requires custom native module)
+    await waitFor(element(by.text('Task completed')))
+      .toBeVisible()
+      .withTimeout(10000);
+  });
+});
+```
+
+9.4 MANUAL TESTING CHECKLIST
+-----------------------------
+□ Voice input (TTS/STT)
+□ Wake word detection
+□ Task execution (simple)
+□ Task execution (complex)
+□ Triggers (all types)
+□ Permission flows
+□ Subscription flow
+□ Settings changes
+□ Offline behavior
+□ Error handling
+□ UI on different screen sizes
+□ Dark mode
+□ Accessibility features
+
+================================================================================
+10. RISK MITIGATION
+================================================================================
+
+10.1 TECHNICAL RISKS
+--------------------
+Risk 1: Native Module Complexity
+Severity: HIGH
+Impact: Critical features may not work
+Mitigation:
+• Build proof of concept early (Phase 0)
+• Hire Android/iOS native developers
+• Budget extra time for native development
+• Consider abandoning migration if PoC fails
+
+Risk 2: Performance Degradation
+Severity: MEDIUM
+Impact: Slower task execution, poor UX
+Mitigation:
+• Use Hermes engine
+• Optimize bundle size
+• Profile early and often
+• Move critical operations to native modules
+
+Risk 3: Background Task Limitations
+Severity: HIGH
+Impact: Agent may not run reliably in background
+Mitigation:
+• Extensive testing on different Android versions
+• Use foreground service notifications
+• Educate users on battery optimization
+• Consider wake lock strategies
+
+Risk 4: Team Expertise
+Severity: MEDIUM
+Impact: Slower development, more bugs
+Mitigation:
+• Training on React Native
+• Hire React Native experts
+• Pair programming
+• Code reviews
+
+Risk 5: Breaking Changes in Dependencies
+Severity: MEDIUM
+Impact: Build failures, feature breakage
+Mitigation:
+• Lock dependency versions
+• Regular updates and testing
+• Monitor deprecation notices
+• Have rollback plans
+
+10.2 PROJECT RISKS
+------------------
+Risk 6: Scope Creep
+Severity: MEDIUM
+Impact: Delayed launch, budget overrun
+Mitigation:
+• Strict scope definition
+• Change control process
+• Regular stakeholder alignment
+• MVP-first approach
+
+Risk 7: Timeline Slippage
+Severity: HIGH
+Impact: Missed deadlines, competitive disadvantage
+Mitigation:
+• Buffer time in estimates (30%)
+• Weekly progress reviews
+• Early identification of blockers
+• Parallel workstreams
+
+Risk 8: Resource Availability
+Severity: MEDIUM
+Impact: Development slowdown
+Mitigation:
+• Cross-training team members
+• Documentation
+• Backup resources identified
+
+10.3 BUSINESS RISKS
+-------------------
+Risk 9: User Adoption
+Severity: MEDIUM
+Impact: Users prefer old app
+Mitigation:
+• Beta testing program
+• Gradual rollout
+• Keep Android app available initially
+• Gather feedback early
+
+Risk 10: Feature Parity
+Severity: HIGH
+Impact: Missing features frustrate users
+Mitigation:
+• Feature comparison matrix
+• Prioritize critical features
+• Communicate limitations clearly
+• Phased feature rollout
+
+================================================================================
+11. ALTERNATIVE APPROACHES
+================================================================================
+
+11.1 ALTERNATIVE 1: Stay with Native Android
+---------------------------------------------
+Recommendation: STRONGLY CONSIDER THIS
+
+Pros:
+✅ No migration cost
+✅ Full Android API access
+✅ Better performance
+✅ Existing codebase is mature
+✅ Team expertise
+
+Cons:
+❌ No iOS support
+❌ No web support
+❌ Smaller developer pool
+
+When to Choose:
+• If Android-only is acceptable
+• If core features require deep Android integration
+• If team is comfortable with Kotlin
+
+11.2 ALTERNATIVE 2: Flutter
+---------------------------
+Recommendation: BETTER THAN REACT NATIVE for this app
+
+Pros:
+✅ Better native API access than React Native
+✅ Platform channels easier than native modules
+✅ Better performance
+✅ Cross-platform (Android, iOS, Web)
+✅ Growing ecosystem
+
+Cons:
+❌ Different language (Dart)
+❌ Smaller community than React Native
+❌ Still requires native code for accessibility
+
+When to Choose:
+• If cross-platform is required
+• If performance is critical
+• If team willing to learn Dart
+
+11.3 ALTERNATIVE 3: Kotlin Multiplatform Mobile (KMM)
+-----------------------------------------------------
+Recommendation: IDEAL for this project
+
+Pros:
+✅ Share business logic in Kotlin
+✅ Native UI (keep Compose Android, SwiftUI iOS)
+✅ Best performance
+✅ Gradual migration (share logic first)
+✅ Keep existing Kotlin code
+✅ Full native API access
+
+Cons:
+❌ Relatively new technology
+❌ iOS team needs Swift knowledge
+❌ Smaller community
+
+When to Choose:
+• If want to keep Kotlin
+• If gradual migration preferred
+• If iOS support needed
+• If performance critical
+
+11.4 ALTERNATIVE 4: Progressive Web App (PWA)
+----------------------------------------------
+Recommendation: NOT SUITABLE
+
+Pros:
+✅ Web + mobile
+✅ No app store approval
+
+Cons:
+❌ Cannot access Android Accessibility Service
+❌ Cannot run in background reliably
+❌ Cannot control device
+❌ Limited permissions
+
+When to Choose:
+• Never for this use case
+
+11.5 ALTERNATIVE 5: Hybrid Approach
+------------------------------------
+Recommendation: PRAGMATIC OPTION
+
+Keep core Android app for automation
+Build React Native companion app for:
+• UI/UX
+• Settings
+• Task management
+• Viewing results
+
+Communication: IPC or shared database
+
+Pros:
+✅ Best of both worlds
+✅ Faster migration
+✅ Leverage React Native for UI
+✅ Keep native for automation
+
+Cons:
+❌ Two codebases to maintain
+❌ Synchronization complexity
+
+When to Choose:
+• If want React Native benefits without full rewrite
+• If automation must remain native
+
+11.6 DECISION MATRIX
+--------------------
+Option | Cross-Platform | Performance | Dev Speed | Maintenance
+-------|----------------|-------------|-----------|------------
+Stay Native | ❌ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐
+React Native | ✅ | ⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐
+Flutter | ✅ | ⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐
+KMM | ✅ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐
+Hybrid | Partial | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐
+
+================================================================================
+12. DETAILED IMPLEMENTATION STEPS
+================================================================================
+
+12.1 STEP-BY-STEP: Project Initialization
+------------------------------------------
+Step 1: Create Expo Project (Bare Workflow)
+```bash
+npx create-expo-app openflow-rn --template expo-template-bare-minimum
+cd openflow-rn
+```
+
+Step 2: Add TypeScript
+```bash
+npm install --save-dev typescript @types/react @types/react-native
+npx tsc --init
+```
+
+Step 3: Configure TypeScript (tsconfig.json)
+```json
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "commonjs",
+    "lib": ["es2019"],
+    "jsx": "react-native",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
+}
+```
+
+Step 4: Project Structure
+```bash
+mkdir -p src/{screens,components,navigation,services,api,utils,models,state,native,agent,config}
+```
+
+Step 5: Install Core Dependencies
+```bash
+# Navigation
+npm install @react-navigation/native @react-navigation/stack
+npm install react-native-screens react-native-safe-area-context
+
+# State Management
+npm install @reduxjs/toolkit react-redux
+
+# UI
+npm install react-native-paper
+
+# Firebase
+npm install @react-native-firebase/app @react-native-firebase/auth
+npm install @react-native-firebase/firestore @react-native-firebase/analytics
+
+# Voice
+npm install expo-speech react-native-voice
+npm install @picovoice/react-native-porcupine
+
+# Utilities
+npm install axios
+npm install @react-native-async-storage/async-storage
+npm install expo-file-system expo-sqlite
+
+# Development
+npm install --save-dev @typescript-eslint/parser @typescript-eslint/eslint-plugin
+npm install --save-dev prettier eslint-config-prettier eslint-plugin-prettier
+```
+
+Step 6: Configure ESLint (.eslintrc.js)
+```javascript
+module.exports = {
+  root: true,
+  extends: [
+    '@react-native-community',
+    'plugin:@typescript-eslint/recommended',
+    'prettier',
+  ],
+  parser: '@typescript-eslint/parser',
+  plugins: ['@typescript-eslint'],
+};
+```
+
+Step 7: Configure Prettier (.prettierrc)
+```json
+{
+  "semi": true,
+  "singleQuote": true,
+  "tabWidth": 2,
+  "trailingComma": "es5"
+}
+```
+
+Step 8: Configure app.json
+```json
+{
+  "expo": {
+    "name": "OpenFlow-AI",
+    "slug": "openflow-rn",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.openflow.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.seemoo.openflow",
+      "permissions": [
+        "RECORD_AUDIO",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "FOREGROUND_SERVICE",
+        "SYSTEM_ALERT_WINDOW",
+        "RECEIVE_BOOT_COMPLETED"
+      ]
+    },
+    "plugins": [
+      "@react-native-firebase/app",
+      "expo-build-properties"
+    ]
+  }
+}
+```
+
+12.2 STEP-BY-STEP: Native Module Creation (Android)
+----------------------------------------------------
+Example: Accessibility Module
+
+Step 1: Create Native Module Package
+```bash
+cd android
+mkdir -p app/src/main/java/com/openflow/accessibility
+```
+
+Step 2: Create Module File (AccessibilityModule.java)
+```java
+package com.openflow.accessibility;
+
+import com.facebook.react.bridge.*;
+import com.facebook.react.modules.core.DeviceEventManagerModule;
+
+public class AccessibilityModule extends ReactContextBaseJavaModule {
+    private static final String MODULE_NAME = "AccessibilityModule";
+    
+    public AccessibilityModule(ReactApplicationContext context) {
+        super(context);
+    }
+    
+    @Override
+    public String getName() {
+        return MODULE_NAME;
+    }
+    
+    @ReactMethod
+    public void captureScreen(Promise promise) {
+        // Implementation here
+        try {
+            String base64 = captureScreenInternal();
+            promise.resolve(base64);
+        } catch (Exception e) {
+            promise.reject("CAPTURE_ERROR", e.getMessage());
+        }
+    }
+    
+    @ReactMethod
+    public void tapElement(double x, double y, Promise promise) {
+        // Implementation here
+    }
+    
+    // More methods...
+}
+```
+
+Step 3: Create Package File (AccessibilityPackage.java)
+```java
+package com.openflow.accessibility;
+
+import com.facebook.react.ReactPackage;
+import com.facebook.react.bridge.NativeModule;
+import com.facebook.react.bridge.ReactApplicationContext;
+import com.facebook.react.uimanager.ViewManager;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+public class AccessibilityPackage implements ReactPackage {
+    @Override
+    public List<NativeModule> createNativeModules(ReactApplicationContext context) {
+        List<NativeModule> modules = new ArrayList<>();
+        modules.add(new AccessibilityModule(context));
+        return modules;
+    }
+
+    @Override
+    public List<ViewManager> createViewManagers(ReactApplicationContext context) {
+        return Collections.emptyList();
+    }
+}
+```
+
+Step 4: Register Package (MainApplication.java)
+```java
+import com.openflow.accessibility.AccessibilityPackage;
+
+@Override
+protected List<ReactPackage> getPackages() {
+    List<ReactPackage> packages = new PackageList(this).getPackages();
+    packages.add(new AccessibilityPackage());
+    return packages;
+}
+```
+
+Step 5: Create TypeScript Interface
+```typescript
+// src/native/AccessibilityModule.ts
+import { NativeModules } from 'react-native';
+
+interface IAccessibilityModule {
+  captureScreen(): Promise<string>;
+  tapElement(x: number, y: number): Promise<void>;
+  // More methods...
+}
+
+const { AccessibilityModule } = NativeModules;
+
+export default AccessibilityModule as IAccessibilityModule;
+```
+
+Step 6: Use in Code
+```typescript
+// src/services/ScreenCaptureService.ts
+import AccessibilityModule from '../native/AccessibilityModule';
+
+class ScreenCaptureService {
+  async capture(): Promise<string> {
+    try {
+      const base64 = await AccessibilityModule.captureScreen();
+      return base64;
+    } catch (error) {
+      console.error('Screen capture failed:', error);
+      throw error;
+    }
+  }
+}
+```
+
+12.3 STEP-BY-STEP: Agent Core Migration
+----------------------------------------
+Example: Porting Agent.kt to Agent.ts
+
+Step 1: Define Types
+```typescript
+// src/agent/types.ts
+export interface AgentSettings {
+  maxSteps: number;
+  maxActions: number;
+  maxFailures: number;
+}
+
+export interface AgentState {
+  stopped: boolean;
+  nSteps: number;
+  consecutiveFailures: number;
+  lastModelOutput?: AgentOutput;
+  lastResult?: ActionResult[];
+}
+
+export interface ScreenState {
+  currentApp: string;
+  elements: UIElement[];
+  screenshot?: string;
+  dimensions: { width: number; height: number };
+}
+```
+
+Step 2: Create Agent Class
+```typescript
+// src/agent/Agent.ts
+import { AgentSettings, AgentState, ScreenState } from './types';
+import { Perception } from './Perception';
+import { GeminiClient } from '../api/GeminiClient';
+import { ActionExecutor } from './actions/ActionExecutor';
+import { MemoryManager } from './MemoryManager';
+import { FileSystem } from '../services/FileSystem';
+import { SpeechCoordinator } from '../services/SpeechCoordinator';
+
+export class Agent {
+  private state: AgentState;
+  private history: AgentHistory[];
+  
+  constructor(
+    private settings: AgentSettings,
+    private memoryManager: MemoryManager,
+    private perception: Perception,
+    private llmClient: GeminiClient,
+    private actionExecutor: ActionExecutor,
+    private fileSystem: FileSystem,
+    private speechCoordinator: SpeechCoordinator
+  ) {
+    this.state = {
+      stopped: false,
+      nSteps: 0,
+      consecutiveFailures: 0,
+    };
+    this.history = [];
+  }
+  
+  async run(initialTask: string, maxSteps: number = 150): Promise<void> {
+    this.memoryManager.addNewTask(initialTask);
+    this.state.stopped = false;
+    
+    console.log(`--- Agent starting task: '${initialTask}' ---`);
+    
+    while (!this.state.stopped && this.state.nSteps <= maxSteps) {
+      console.log(`\n--- Step ${this.state.nSteps}/${maxSteps} ---`);
+      
+      // 1. SENSE
+      console.log('👀 Sensing screen state...');
+      const screenState = await this.perception.analyze();
+      
+      // 2. THINK (Prepare Prompt)
+      console.log('🧠 Preparing prompt...');
+      this.memoryManager.createStateMessage(
+        this.state.lastModelOutput,
+        this.state.lastResult,
+        { step: this.state.nSteps, maxSteps },
+        screenState
+      );
+      
+      // 3. THINK (Get Decision)
+      console.log('🤔 Asking LLM for next action...');
+      const messages = this.memoryManager.getMessages();
+      const agentOutput = await this.llmClient.generateAgentOutput(messages);
+      
+      // Handle LLM Failure
+      if (!agentOutput) {
+        console.log('❌ LLM failed to return valid action. Retrying...');
+        this.state.consecutiveFailures++;
+        
+        if (this.state.consecutiveFailures >= this.settings.maxFailures) {
+          console.log('❌ Agent failed too many times. Stopping.');
+          await this.speechCoordinator.speak(
+            'Agent failed after multiple attempts. Stopping execution.'
+          );
+          break;
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        continue;
+      }
+      
+      this.state.consecutiveFailures = 0;
+      this.state.lastModelOutput = agentOutput;
+      console.log(`🤖 LLM decided: ${agentOutput.nextGoal}`);
+      
+      // 4. ACT
+      console.log('💪 Executing actions...');
+      const actionResults = [];
+      
+      for (const action of agentOutput.action) {
+        const result = await this.actionExecutor.execute(
+          action,
+          screenState,
+          this.fileSystem
+        );
+        actionResults.push(result);
+        console.log(
+          `  - Action '${action.type}' executed. Result: ${
+            result.error || 'OK'
+          }`
+        );
+        
+        if (result.error) {
+          console.log('  - 🛑 Action failed. Stopping current step.');
+          break;
+        }
+      }
+      
+      this.state.lastResult = actionResults;
+      
+      // 5. RECORD
+      this.history.push({
+        modelOutput: agentOutput,
+        result: actionResults,
+        state: screenState,
+        metadata: { timestamp: Date.now() },
+      });
+      
+      // 6. CHECK STOP CONDITION
+      const hasDoneAction = agentOutput.action.some(
+        a => a.type === 'done'
+      );
+      if (hasDoneAction) {
+        console.log('✅ Agent completed task (done action).');
+        this.state.stopped = true;
+      }
+      
+      this.state.nSteps++;
+    }
+    
+    if (this.state.nSteps > maxSteps) {
+      console.log('⏱️ Agent reached max steps.');
+    }
+    
+    console.log('--- Agent finished ---');
+  }
+  
+  getHistory() {
+    return this.history;
+  }
+}
+```
+
+Step 3: Create Supporting Classes (similar pattern)
+- Perception.ts
+- ActionExecutor.ts
+- MemoryManager.ts
+- etc.
+
+12.4 STEP-BY-STEP: Screen Migration
+------------------------------------
+Example: MainActivity → HomeScreen
+
+Step 1: Create Screen Component
+```typescript
+// src/screens/HomeScreen.tsx
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { Text, Button } from 'react-native-paper';
+import { useSelector, useDispatch } from 'react-redux';
+import { STTService } from '../services/STTService';
+import { AgentService } from '../services/AgentService';
+
+export const HomeScreen: React.FC = ({ navigation }) => {
+  const [isListening, setIsListening] = useState(false);
+  const [taskInput, setTaskInput] = useState('');
+  const user = useSelector(state => state.auth.user);
+  const isAgentRunning = useSelector(state => state.agent.isRunning);
+  
+  const handleMicPress = async () => {
+    setIsListening(true);
+    const text = await STTService.listen();
+    setIsListening(false);
+    
+    if (text) {
+      setTaskInput(text);
+      await handleExecuteTask(text);
+    }
+  };
+  
+  const handleExecuteTask = async (task: string) => {
+    try {
+      await AgentService.startTask(task);
+    } catch (error) {
+      console.error('Task execution failed:', error);
+    }
+  };
+  
+  return (
+    <View style={styles.container}>
+      <Text variant="headlineLarge">OpenFlow-AI</Text>
+      
+      <TouchableOpacity
+        style={[styles.micButton, isListening && styles.micButtonActive]}
+        onPress={handleMicPress}
+        disabled={isAgentRunning}
+      >
+        <Text style={styles.micIcon}>🎤</Text>
+      </TouchableOpacity>
+      
+      <Text variant="bodyMedium">
+        {isListening ? 'Listening...' : 'Hold to speak'}
+      </Text>
+      
+      <Button
+        mode="contained"
+        onPress={() => navigation.navigate('Settings')}
+        style={styles.button}
+      >
+        Settings
+      </Button>
+      
+      <Button
+        mode="outlined"
+        onPress={() => navigation.navigate('Triggers')}
+        style={styles.button}
+      >
+        Triggers
+      </Button>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  micButton: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#007AFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 20,
+  },
+  micButtonActive: {
+    backgroundColor: '#FF3B30',
+  },
+  micIcon: {
+    fontSize: 40,
+  },
+  button: {
+    marginTop: 10,
+    width: '80%',
+  },
+});
+```
+
+Step 2: Register in Navigation
+```typescript
+// src/navigation/AppNavigator.tsx
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import { HomeScreen } from '../screens/HomeScreen';
+import { SettingsScreen } from '../screens/SettingsScreen';
+import { TriggersScreen } from '../screens/TriggersScreen';
+
+const Stack = createStackNavigator();
+
+export const AppNavigator = () => {
+  return (
+    <NavigationContainer>
+      <Stack.Navigator initialRouteName="Home">
+        <Stack.Screen 
+          name="Home" 
+          component={HomeScreen}
+          options={{ title: 'OpenFlow-AI' }}
+        />
+        <Stack.Screen 
+          name="Settings" 
+          component={SettingsScreen} 
+        />
+        <Stack.Screen 
+          name="Triggers" 
+          component={TriggersScreen} 
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+};
+```
+
+Step 3: Wire Up in App.tsx
+```typescript
+// App.tsx
+import React from 'react';
+import { Provider } from 'react-redux';
+import { PaperProvider } from 'react-native-paper';
+import { AppNavigator } from './src/navigation/AppNavigator';
+import { store } from './src/state/store';
+
+export default function App() {
+  return (
+    <Provider store={store}>
+      <PaperProvider>
+        <AppNavigator />
+      </PaperProvider>
+    </Provider>
+  );
+}
+```
+
+================================================================================
+13. RESOURCE REQUIREMENTS
+================================================================================
+
+13.1 TEAM COMPOSITION
+---------------------
+Minimum Viable Team (6-12 months):
+
+1. Technical Lead (1)
+   - React Native expert
+   - 5+ years experience
+   - Full-time
+
+2. Senior React Native Developers (2)
+   - TypeScript expertise
+   - State management
+   - Full-time
+
+3. Native Module Developers (2)
+   - Android (Java/Kotlin) - Full-time
+   - iOS (Swift) - Part-time
+
+4. Backend Developer (1)
+   - Firebase expertise
+   - API integrations
+   - Part-time
+
+5. UI/UX Designer (1)
+   - Mobile design
+   - Part-time
+
+6. QA Engineer (1)
+   - Mobile testing
+   - Automation
+   - Full-time
+
+7. DevOps Engineer (1)
+   - CI/CD
+   - App store deployment
+   - Part-time
+
+Total: 5 FTE (full-time equivalent)
+
+13.2 INFRASTRUCTURE
+-------------------
+Development:
+• MacBook Pro (for iOS development) - $2,500 ea x 5 = $12,500
+• Android devices (testing) - $500 ea x 5 = $2,500
+• iOS devices (testing) - $800 ea x 3 = $2,400
+
+Services:
+• Firebase (Blaze plan) - $500/month
+• EAS Build credits - $300/month
+• TestFlight - Free
+• Play Console - $25 one-time
+• Apple Developer - $99/year
+• CI/CD (GitHub Actions) - Free tier
+• Error tracking (Sentry) - $26/month
+
+Total Infrastructure: $20,400 upfront + $826/month
+
+13.3 THIRD-PARTY COSTS
+----------------------
+• Gemini API - Pay as you go
+• Picovoice - Free tier or $0.01/query
+• Google Cloud TTS - $4/million characters
+• Firebase - Blaze plan usage-based
+• RevenueCat (if used) - Free tier
+
+Estimated: $200-500/month depending on usage
+
+13.4 TOTAL BUDGET ESTIMATE
+---------------------------
+Personnel (assuming $100k avg salary):
+• 5 FTE x $100k/year ÷ 12 months = $41,667/month
+• 12 months = $500,000
+
+Infrastructure:
+• Upfront: $20,400
+• 12 months x $826 = $9,912
+
+Services:
+• 12 months x $300 = $3,600
+
+Contingency (20%): $106,782
+
+TOTAL: $640,694 (~$640k for 12-month project)
+
+For 6-month aggressive timeline: ~$320k
+
+================================================================================
+14. SUCCESS CRITERIA
+================================================================================
+
+14.1 TECHNICAL SUCCESS CRITERIA
+--------------------------------
+□ All core features functional:
+  - Voice input/output
+  - Task execution
+  - Triggers
+  - UI automation (Android)
+
+□ Performance benchmarks met:
+  - App launch < 3 seconds
+  - Voice recognition < 500ms latency
+  - Task execution no more than 20% slower than native
+
+□ Test coverage:
+  - Unit tests > 70%
+  - Integration tests for all critical paths
+  - E2E tests for main user journeys
+
+□ Code quality:
+  - No major bugs in production
+  - ESLint/Prettier compliance
+  - TypeScript strict mode
+
+□ Cross-platform (if iOS included):
+  - Feature parity where possible
+  - Platform-specific features documented
+
+14.2 BUSINESS SUCCESS CRITERIA
+-------------------------------
+□ User adoption:
+  - 70% of existing users migrate within 3 months
+  - User satisfaction score > 4.0/5.0
+
+□ Performance:
+  - Crash rate < 1%
+  - ANR rate < 0.5%
+  - User retention same or better than native app
+
+□ App Store:
+  - Play Store rating > 4.0
+  - App Store rating > 4.0 (if iOS)
+  - Approved on first submission
+
+14.3 PROJECT SUCCESS CRITERIA
+------------------------------
+□ On time:
+  - Launch within 10% of estimated timeline
+
+□ On budget:
+  - Total cost within 15% of estimate
+
+□ Team satisfaction:
+  - Low turnover during project
+  - Knowledge transfer completed
+
+================================================================================
+FINAL RECOMMENDATIONS
+================================================================================
+
+VERDICT: MIGRATION IS POSSIBLE BUT NOT RECOMMENDED ⚠️
+
+Reasons:
+1. Core feature (Accessibility Service) requires extensive native code
+2. 6-12 month timeline with significant risk
+3. ~$320k-640k cost
+4. Feature compromises, especially on iOS
+5. Performance may degrade
+
+BETTER ALTERNATIVES (in order of preference):
+
+1. ⭐⭐⭐⭐⭐ STAY WITH NATIVE ANDROID
+   - Keep existing mature codebase
+   - Add features instead of rewriting
+   - Best for this use case
+
+2. ⭐⭐⭐⭐ KOTLIN MULTIPLATFORM MOBILE (KMM)
+   - Share business logic
+   - Keep native UI
+   - Gradual migration
+   - Leverage existing Kotlin
+
+3. ⭐⭐⭐ FLUTTER
+   - Better native access than RN
+   - Good performance
+   - Cross-platform
+
+4. ⭐⭐ REACT NATIVE (this plan)
+   - Only if:
+     * iOS is critical requirement
+     * Team strongly prefers React ecosystem
+     * Accept extensive native module work
+     * Have budget and timeline
+
+IF PROCEEDING WITH REACT NATIVE:
+✓ Use Expo Bare Workflow (not managed)
+✓ Build proof of concept first (Phase 0)
+✓ Budget for extensive native module development
+✓ Hire experienced React Native + native developers
+✓ Accept 12-18 month timeline
+✓ Plan for feature compromises
+✓ Consider hybrid approach (native automation, RN UI)
+
+DECISION GATE:
+After Phase 0 Proof of Concept (6 weeks), evaluate:
+□ Can native modules provide core functionality?
+□ Is performance acceptable?
+□ Can timeline and budget be met?
+□ Is team confident in approach?
+
+If any answer is NO → Abort migration, choose alternative
+
+================================================================================
+END OF MIGRATION PLAN
+================================================================================
+
+This migration plan is comprehensive but honest about challenges. The decision
+to proceed should be based on business requirements, not just technical
+possibility. Consider alternatives seriously.
+
+Questions? Need clarification? Consult with experienced React Native architects
+before committing to this path.
+
+Good luck! 🚀

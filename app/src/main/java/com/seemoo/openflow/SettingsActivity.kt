@@ -23,7 +23,6 @@ import com.seemoo.openflow.api.PicovoiceKeyManager
 import com.seemoo.openflow.api.TTSVoice
 import com.seemoo.openflow.utilities.SpeechCoordinator
 import com.seemoo.openflow.utilities.VoicePreferenceManager
-import com.seemoo.openflow.utilities.UserProfileManager
 import com.seemoo.openflow.utilities.WakeWordManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -39,12 +38,9 @@ class SettingsActivity : BaseNavigationActivity() {
     private lateinit var permissionsInfoButton: TextView
     private lateinit var batteryOptimizationHelpButton: TextView
     private lateinit var appVersionText: TextView
-    private lateinit var editUserName: android.widget.EditText
-    private lateinit var editUserEmail: android.widget.EditText
     private lateinit var editWakeWordKey: android.widget.EditText
     private lateinit var textGetPicovoiceKeyLink: TextView
     private lateinit var wakeWordButton: TextView
-    private lateinit var buttonSignOut: Button
     private lateinit var wakeWordManager: WakeWordManager
     private lateinit var requestPermissionLauncher: ActivityResultLauncher<String>
 
@@ -109,23 +105,11 @@ class SettingsActivity : BaseNavigationActivity() {
       
         editWakeWordKey = findViewById(R.id.editWakeWordKey)
         wakeWordButton = findViewById(R.id.wakeWordButton)
-
-        buttonSignOut = findViewById(R.id.buttonSignOut)
-
-        editUserName = findViewById(R.id.editUserName)
-        editUserEmail = findViewById(R.id.editUserEmail)
         textGetPicovoiceKeyLink = findViewById(R.id.textGetPicovoiceKeyLink)
 
 
         setupClickListeners()
         setupVoicePicker()
-
-        // Prefill profile fields from saved values
-        kotlin.runCatching {
-            val pm = UserProfileManager(this)
-            editUserName.setText(pm.getName() ?: "")
-            editUserEmail.setText(pm.getEmail() ?: "")
-        }
 
         // Show app version
         val versionName = BuildConfig.VERSION_NAME
@@ -184,10 +168,6 @@ class SettingsActivity : BaseNavigationActivity() {
             }
         }
 
-
-        buttonSignOut.setOnClickListener {
-            showSignOutConfirmationDialog()
-        }
 
         findViewById<TextView>(R.id.viewTaskLogsButton).setOnClickListener {
             startActivity(Intent(this, TaskLogsListActivity::class.java))
@@ -355,32 +335,7 @@ class SettingsActivity : BaseNavigationActivity() {
         )
     }
 
-    private fun showSignOutConfirmationDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("Sign Out")
-            .setMessage("Are you sure you want to sign out? This will clear all your settings and data.")
-            .setPositiveButton("Sign Out") { _, _ ->
-                signOut()
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
 
-    private fun signOut() {
-        // Clear User Profile
-        val userProfileManager = UserProfileManager(this)
-        userProfileManager.clearProfile()
-
-        // Clear all shared preferences for this app
-        getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().clear().apply()
-
-
-        // Restart the app by navigating to the onboarding screen
-        val intent = Intent(this, LoginActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(intent)
-        finish()
-    }
 
     
     override fun getContentLayoutId(): Int = R.layout.activity_settings

@@ -5,43 +5,12 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- Loading overlay -->
-    <LinearLayout
-        android:id="@+id/loading_overlay"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#80000000"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:visibility="gone">
-
-        <ProgressBar
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:indeterminateTint="#FFFFFF" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Checking subscription status..."
-            android:textColor="#FFFFFF"
-            android:textSize="16sp" />
-    </LinearLayout>
-
-    <!-- Pro Upgrade Banner -->
-    <include
-        android:id="@+id/pro_upgrade_banner"
-        layout="@layout/pro_upgrade_banner"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_alignParentTop="true" />
+    <!-- Loading overlay - REMOVED (no longer needed without billing) -->
 
     <!-- Main content area -->
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@+id/pro_upgrade_banner"
         android:layout_above="@+id/permission_section"
         android:fillViewport="true">
 
@@ -198,41 +167,7 @@
                 android:orientation="horizontal"
                 android:gravity="center">
 
-                <!-- Pro Subscription Tag -->
-                <LinearLayout
-                    android:id="@+id/pro_subscription_tag"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:background="@drawable/status_tag_background"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="8dp"
-                    android:paddingTop="4dp"
-                    android:paddingBottom="4dp"
-                    android:visibility="gone">
-
-                    <ImageView
-                        android:layout_width="12dp"
-                        android:layout_height="12dp"
-                        android:layout_marginEnd="4dp"
-                        android:src="@drawable/ic_check_circle"
-                        android:tint="#4CAF50" />
-
-                    <TextView
-                        android:id="@+id/billing_status_textview"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Pro Active"
-                        android:textColor="#BDBDBD"
-                        android:textSize="10sp"
-                        tools:text="Pro Active"
-                        tools:visibility="visible" />
-
-                </LinearLayout>
-
-                <!-- Permissions Tag -->
+                <!-- Pro, Tasks, and Permissions Tags - SIMPLIFIED -->
                 <LinearLayout
                     android:id="@+id/permissions_tag"
                     android:layout_width="wrap_content"
@@ -267,41 +202,9 @@
                 </LinearLayout>
 
 
-                <LinearLayout
-                    android:id="@+id/tasks_left_tag"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:background="@drawable/status_tag_background"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="8dp"
-                    android:paddingTop="4dp"
-                    android:paddingBottom="4dp"
-                    tools:visibility="visible">
-
-                    <ImageView
-                        android:layout_width="12dp"
-                        android:layout_height="12dp"
-                        android:layout_marginEnd="4dp"
-                        android:src="@drawable/outline_hourglass_bottom_24"
-                        android:tint="#4CAF50"  />
-
-                    <TextView
-                        android:id="@+id/tasks_left_tag_text"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:textColor="#BDBDBD"
-                        android:textSize="10sp"
-                        tools:text="15 Tasks Left" />
-
-                </LinearLayout>
-
-
             </LinearLayout>
 
-            <!-- Essential element: "Free tasks left" text - preserved with existing styling -->
+            <!-- "Free tasks left" text - REMOVED (app is now fully free) -->
             <TextView
                 android:id="@+id/tasks_remaining_textview"
                 android:layout_width="wrap_content"

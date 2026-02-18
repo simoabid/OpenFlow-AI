@@ -1,0 +1,1652 @@
+================================================================================
+                    OPENFLOW-AI PROJECT COMPREHENSIVE SUMMARY
+================================================================================
+Last Updated: February 12, 2026
+Project Version: 1.0.66 (Build 57)
+================================================================================
+
+TABLE OF CONTENTS
+1. Project Overview
+2. Architecture & Design
+3. Key Features & Capabilities
+4. Technical Stack
+5. Project Structure
+6. Core Components Deep Dive
+7. API Integrations
+8. Build System & Configuration
+9. Testing Infrastructure
+10. Documentation
+11. Future Roadmap
+12. Development Notes
+
+================================================================================
+1. PROJECT OVERVIEW
+================================================================================
+
+OpenFlow-AI is a revolutionary Android application that serves as a proactive,
+on-device AI agent for Android. It acts as a personal phone operator that can:
+
+- Understand natural language voice commands
+- Autonomously navigate and operate phone UI
+- Execute complex, multi-step tasks across different applications
+- Remember user preferences and context (currently disabled)
+- Respond with high-quality voice synthesis
+
+TAGLINE: "You touch grass. I'll touch your glass."
+
+PROJECT STATUS: Work In Progress (WIP)
+LICENSE: Personal Use Only (Commercial license required for business use)
+REPOSITORY: https://github.com/simoabid/OpenFlow-AI
+PLAY STORE: Available on Google Play Store
+
+================================================================================
+2. ARCHITECTURE & DESIGN
+================================================================================
+
+2.1 MULTI-AGENT ARCHITECTURE
+-----------------------------
+OpenFlow-AI uses a sophisticated multi-agent system architecture:
+
+┌─────────────────────────────────────────────────────────────┐
+│                        USER                                 │
+│                     (Voice/Text Input)                      │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    AGENT SERVICE                            │
+│              (v2.AgentService.kt)                          │
+│   • Foreground Service hosting the AI Agent                │
+│   • Manages agent lifecycle and task queue                 │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   AGENT (v2.Agent.kt)                      │
+│              Main Agent Loop: SENSE → THINK → ACT          │
+│   ┌─────────────────────────────────────────────────┐     │
+│   │  1. SENSE: Perception.analyze()                 │     │
+│   │     - Capture screenshot or XML hierarchy       │     │
+│   │     - Parse UI elements                         │     │
+│   │  2. THINK: LLM Analysis                         │     │
+│   │     - Build prompt with state & history         │     │
+│   │     - Query Gemini AI for next action          │     │
+│   │  3. ACT: ActionExecutor.execute()               │     │
+│   │     - Tap, scroll, type, open apps              │     │
+│   │     - File operations, web searches             │     │
+│   └─────────────────────────────────────────────────┘     │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+        ┌────────────┼────────────┐
+        │            │            │
+        ▼            ▼            ▼
+┌──────────┐  ┌──────────┐  ┌──────────┐
+│  EYES    │  │  BRAIN   │  │  HANDS   │
+│ (Perception)  (LLM)    │ (Actions)  │
+│          │  │          │  │          │
+│ Eyes.kt  │  │ GeminiAPI│  │ Finger.kt│
+│ Screen   │  │ Gemini   │  │ Gestures │
+│ Analysis │  │ AI Model │  │ Controls │
+└──────────┘  └──────────┘  └──────────┘
+        │            │            │
+        └────────────┼────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────────┐
+│           ACCESSIBILITY SERVICE                             │
+│       (ScreenInteractionService.kt)                        │
+│   • Low-level access to screen hierarchy                   │
+│   • Perform gestures (tap, swipe, long-press)             │
+│   • Capture screenshots                                     │
+│   • Input text and navigation (back, home, etc.)           │
+└─────────────────────────────────────────────────────────────┘
+
+2.2 KEY DESIGN PRINCIPLES
+--------------------------
+• Separation of Concerns: Eyes (perception), Brain (reasoning), Hands (action)
+• Stateful Agent Loop: Maintains context across multiple steps
+• Tool-Using AI: LLM decides which tools/actions to use
+• Memory Management: Short-term (MemoryManager) and long-term (FileSystem)
+• Error Handling: Retry mechanisms with exponential backoff
+• Observable Execution: Real-time feedback through overlays and TTS
+
+================================================================================
+3. KEY FEATURES & CAPABILITIES
+================================================================================
+
+3.1 VOICE INTERACTION
+---------------------
+✓ Wake Word Detection:
+  - "Hey OpenFlow-AI" using Porcupine engine
+  - Alternative STT-based wake word detection
+  - Automatic key management for Picovoice API
+  
+✓ Speech-to-Text (STT):
+  - Press-and-hold voice command interface
+  - Android's built-in SpeechRecognizer API
+  - Multiple retry attempts for reliability
+  - Visual feedback during recording
+  
+✓ Text-to-Speech (TTS):
+  - High-quality voice using Google Cloud TTS (Chirp)
+  - Local Android TTS fallback
+  - Audio caching for common phrases
+  - Debug mode controls
+  - Thread-safe speech coordination
+
+3.2 INTERACTIVE DIALOGUE SYSTEM
+--------------------------------
+✓ Automatic Clarification:
+  - Detects unclear user instructions
+  - Generates contextual clarifying questions
+  - Progress tracking (e.g., "2 of 3 questions")
+  - Dual input: voice + text responses
+  
+✓ ClarificationAgent (agents/ClarificationAgent.kt):
+  - Analyzes instructions for ambiguity
+  - Returns: CLEAR or NEEDS_CLARIFICATION
+  - Dynamically generates question lists
+
+Example Flow:
+  User: "Message my brother happy birthday"
+  System: Needs clarification
+    Q1: "What is your brother's name in contacts?"
+    Q2: "Which messaging app to use?"
+  Enhanced: "Message my brother (John Smith) happy birthday via WhatsApp"
+
+3.3 TRIGGER SYSTEM
+------------------
+✓ Multiple Trigger Types:
+  1. SCHEDULED_TIME:
+     - Precise time-based execution
+     - Day-of-week selection
+     - Uses AlarmManager with setExactAndAllowWhileIdle
+     - Automatic rescheduling after boot
+     
+  2. NOTIFICATION:
+     - Monitors notifications from specified apps
+     - Executes tasks on notification receipt
+     - OpenFlowNotificationListenerService
+     
+  3. CHARGING_STATE (ChargingStateReceiver):
+     - Triggers when device charging state changes
+     - Can execute tasks on plug-in/unplug
+
+✓ Trigger Management:
+  - TriggersActivity: View and manage all triggers
+  - CreateTriggerActivity: Configure new triggers
+  - TriggerManager: Persistence and scheduling
+  - BootReceiver: Reschedule after reboot
+
+3.4 TASK AUTOMATION
+-------------------
+✓ Supported Actions (v2/actions/Action.kt):
+  - TapElement: Tap UI element by ID
+  - LongPressElement: Long press for context menus
+  - InputText: Type text into fields
+  - TapElementInputTextPressEnter: Combined input + enter
+  - ScrollUp/ScrollDown: Vertical scrolling
+  - OpenApp: Launch apps directly
+  - SearchGoogle: Perform web searches
+  - Speak: Voice feedback to user
+  - Ask: Request user input
+  - WriteFile/AppendFile/ReadFile: File operations
+  - Done: Mark task completion
+  - LaunchIntent: Execute Android Intents
+  - SwitchApp: App switcher
+  - Back/Home: Navigation
+  - Wait: Pause for loading
+
+✓ UI Automation:
+  - XML-based element identification
+  - Screenshot-based visual analysis
+  - Coordinate-based gestures
+  - Accessibility service integration
+
+3.5 MEMORY SYSTEM (Currently Disabled)
+---------------------------------------
+⚠️ Status: Temporarily disabled as of December 2024
+
+Previous Capabilities:
+  - Persistent conversation memory
+  - Personal information storage
+  - Preference learning
+  - Mem0 API integration
+
+Components (inactive):
+  - data/MemoryManager.kt
+  - data/Memory.kt, MemoryDao.kt
+  - api/MemoryService.kt
+  - MemoriesActivity, MemoriesFragment
+
+Reason for Disabling:
+  - Performance optimization
+  - Enhanced privacy measures
+  - Architecture rebuild
+  - Focus on core features
+
+3.6 VISUAL FEEDBACK SYSTEM
+---------------------------
+✓ Overlay System:
+  - OverlayManager: Centralized overlay control
+  - OverlayDispatcher: Show notifications by priority
+  - OverlayState: Track active overlays
+  - Support for multiple priority levels
+  - Configurable duration and position
+
+✓ Visual Elements:
+  - AudioWaveView: Real-time audio visualization
+  - GlowBorderView: Attention-grabbing borders
+  - DeltaSymbolView: State indicator (OpenFlow logo)
+  - TtsVisualizer: Speech output visualization
+  - STTVisualizer: Speech input visualization
+
+✓ Visual Feedback Types:
+  - Task status updates
+  - Agent "thoughts" (optional)
+  - Error messages
+  - Success confirmations
+  - Loading indicators
+
+3.7 ADVANCED UI FEATURES
+-------------------------
+✓ Direct App Opening (Debug):
+  - Bypasses UI search for app icons
+  - Uses PackageManager to launch directly
+  - Requires QUERY_ALL_PACKAGES permission
+  - Disabled for production builds
+
+✓ Moments System:
+  - MomentsActivity: Timeline of agent actions
+  - MomentsAdapter: Display action history
+  - Firebase-backed storage
+
+✓ Pro Features:
+  - Subscription via Google Play Billing
+  - RevenueCat integration
+  - ProPurchaseActivity: Upgrade flow
+  - Freemium tier with task limits
+
+================================================================================
+4. TECHNICAL STACK
+================================================================================
+
+4.1 PROGRAMMING LANGUAGES
+--------------------------
+• Kotlin: 100% (v2.0.21)
+• Gradle Kotlin DSL: Build configuration
+
+4.2 ANDROID PLATFORM
+--------------------
+• Android Gradle Plugin (AGP): 8.9.2 (CRITICAL: Never downgrade!)
+• Target SDK: 35 (Android 14+)
+• Minimum SDK: 24 (Android 7.0+)
+• Compile SDK: 35
+
+4.3 JETPACK & ANDROIDX LIBRARIES
+---------------------------------
+• Core KTX: 1.16.0 - 1.17.0
+• Lifecycle Runtime KTX: 2.9.0
+• Activity Compose: 1.10.1
+• Compose BOM: 2024.09.00
+• Material3: Latest
+• Room Database: 2.6.1 (w/ KSP)
+• AppCompat: 1.7.0
+• RecyclerView: 1.3.2
+
+4.4 AI/ML LIBRARIES
+-------------------
+• Google Generative AI: 0.9.0 (Gemini SDK)
+• Picovoice Porcupine: 3.0.2 (Wake word detection)
+
+4.5 FIREBASE SERVICES
+----------------------
+• Firebase BOM: 34.3.0
+• Firebase Auth: OAuth integration
+• Firebase Firestore: Database
+• Firebase Remote Config: Feature flags
+• Firebase Crashlytics: Error reporting
+• Firebase Analytics: Usage tracking
+• Firebase Functions: Cloud functions
+
+4.6 NETWORKING
+--------------
+• OkHttp: 5.0.0-alpha.16
+• Internet permission required
+
+4.7 SERIALIZATION & DATA
+-------------------------
+• Kotlinx Serialization: 1.6.3 & 2.2.10
+• Moshi: 1.15.0
+• Gson: 2.13.1
+• Room: Structured data persistence
+
+4.8 TESTING
+-----------
+• JUnit: 4.13.2
+• AndroidX Test JUnit: 1.2.1
+• Espresso Core: 3.6.1
+• UI Automator: 2.3.0
+
+4.9 BILLING
+-----------
+• Google Play Billing: 7.0.0 (billing-ktx)
+• RevenueCat SDK (optional)
+
+4.10 BUILD TOOLS
+----------------
+• Gradle: 8.x
+• KSP (Kotlin Symbol Processing): 2.0.21-1.0.28
+• ProGuard: Code minification
+• Google Services Plugin: 4.4.3
+
+================================================================================
+5. PROJECT STRUCTURE
+================================================================================
+
+OpenFlow-AI/
+├── .github/                          # GitHub configuration
+│   └── copilot-instructions.md       # Development guidelines
+│
+├── app/                              # Main application module
+│   ├── build.gradle.kts              # App-level build configuration
+│   ├── proguard-rules.pro            # ProGuard rules for release
+│   │
+│   └── src/
+│       ├── androidTest/              # Instrumented tests
+│       │   └── java/com/seemoo/
+│       │
+│       ├── main/
+│       │   ├── AndroidManifest.xml   # App manifest (permissions, services)
+│       │   │
+│       │   ├── assets/               # Binary assets
+│       │   │   ├── Panda_en_android_v3_0_0.ppn  # Wake word model
+│       │   │   └── prompts/
+│       │   │       └── system_prompt.md  # Agent system prompt
+│       │   │
+│       │   ├── java/com/seemoo/openflow/
+│       │   │   ├── MainActivity.kt                # Entry point
+│       │   │   ├── LoginActivity.kt.kt           # Auth screen
+│       │   │   ├── ChatActivity.kt               # Conversation UI
+│       │   │   ├── DialogueActivity.kt           # Clarification UI
+│       │   │   ├── SettingsActivity.kt           # App settings
+│       │   │   ├── PermissionsActivity.kt        # Permission management
+│       │   │   ├── OnboardingPermissionsActivity.kt
+│       │   │   ├── MemoriesActivity.kt           # Memory management
+│       │   │   ├── MomentsActivity.kt            # Task history
+│       │   │   ├── ProPurchaseActivity.kt        # Subscription
+│       │   │   ├── MyApplication.kt              # Application class
+│       │   │   ├── ScreenInteractionService.kt   # Accessibility service
+│       │   │   ├── AssistEntryActivity.kt        # Assistant integration
+│       │   │   ├── RoleRequestActivity.kt        # Default assistant
+│       │   │   │
+│       │   │   ├── agents/                      # Agent implementations
+│       │   │   │   └── ClarificationAgent.kt    # Clarification logic
+│       │   │   │
+│       │   │   ├── api/                         # External API clients
+│       │   │   │   ├── GeminiApi.kt             # Gemini AI (legacy)
+│       │   │   │   ├── Eyes.kt                  # Screen capture
+│       │   │   │   ├── Finger.kt                # Gesture execution
+│       │   │   │   ├── GoogleTTS.kt             # Google Cloud TTS
+│       │   │   │   ├── TavilyApi.kt             # Web search
+│       │   │   │   ├── MemoryService.kt         # Memory API
+│       │   │   │   ├── WakeWordDetector.kt      # Interface
+│       │   │   │   ├── PorcupineWakeWordDetector.kt
+│       │   │   │   └── PicovoiceKeyManager.kt   # Key rotation
+│       │   │   │
+│       │   │   ├── data/                        # Data layer
+│       │   │   │   ├── AppDatabase.kt           # Room database
+│       │   │   │   ├── Memory.kt                # Memory entity
+│       │   │   │   ├── MemoryDao.kt             # Database access
+│       │   │   │   ├── MemoryManager.kt         # Memory logic
+│       │   │   │   ├── TaskHistoryItem.kt       # History entity
+│       │   │   │   └── UserMemory.kt            # User-specific
+│       │   │   │
+│       │   │   ├── intents/                     # Intent system
+│       │   │   │   ├── AppIntent.kt             # Intent definitions
+│       │   │   │   ├── IntentRegistry.kt        # Registry pattern
+│       │   │   │   └── impl/                    # Intent implementations
+│       │   │   │
+│       │   │   ├── overlay/                     # Overlay system
+│       │   │   │   ├── OverlayManager.kt        # Manages overlays
+│       │   │   │   ├── OverlayDispatcher.kt     # Show/hide logic
+│       │   │   │   └── OverlayState.kt          # State tracking
+│       │   │   │
+│       │   │   ├── services/                    # Background services
+│       │   │   │   ├── EnhancedWakeWordService.kt
+│       │   │   │   ├── FloatingOpenFlowButtonService.kt
+│       │   │   │   └── WakeWorkService.kt
+│       │   │   │
+│       │   │   ├── triggers/                    # Trigger system
+│       │   │   │   ├── Trigger.kt               # Trigger model
+│       │   │   │   ├── TriggerManager.kt        # Management logic
+│       │   │   │   ├── TriggerReceiver.kt       # Broadcast receiver
+│       │   │   │   ├── BootReceiver.kt          # Reboot handling
+│       │   │   │   ├── ChargingStateReceiver.kt # Charging trigger
+│       │   │   │   ├── OpenFlowNotificationListenerService.kt
+│       │   │   │   ├── TriggerMonitoringService.kt
+│       │   │   │   ├── PermissionUtils.kt       # Permission helpers
+│       │   │   │   └── ui/                      # Trigger UI
+│       │   │   │       ├── TriggersActivity.kt
+│       │   │   │       ├── CreateTriggerActivity.kt
+│       │   │   │       ├── ChooseTriggerTypeActivity.kt
+│       │   │   │       ├── TriggerAdapter.kt
+│       │   │   │       ├── AppAdapter.kt
+│       │   │   │       └── AppInfo.kt
+│       │   │   │
+│       │   │   ├── ui/                          # UI components
+│       │   │   │   └── (various adapters, fragments)
+│       │   │   │
+│       │   │   ├── utilities/                   # Utility classes
+│       │   │   │   ├── ApiKeyManager.kt         # API key rotation
+│       │   │   │   ├── STTManager.kt            # Speech-to-text
+│       │   │   │   ├── TTSManager.kt            # Text-to-speech
+│       │   │   │   ├── SpeechCoordinator.kt     # STT/TTS coordination
+│       │   │   │   ├── STTVisualizer.kt         # Visual feedback
+│       │   │   │   ├── TtsVisualizer.kt         # TTS visualization
+│       │   │   │   ├── WakeWordManager.kt       # Wake word control
+│       │   │   │   ├── FreemiumManager.kt       # Usage limits
+│       │   │   │   ├── PermissionManager.kt     # Permission flow
+│       │   │   │   ├── OnboardingManager.kt     # First-run setup
+│       │   │   │   ├── UserIdManager.kt         # User identification
+│       │   │   │   ├── UserProfileManager.kt    # User profiles
+│       │   │   │   ├── OpenFlowStateManager.kt  # App state
+│       │   │   │   ├── DeltaStateColorMapper.kt # UI colors
+│       │   │   │   ├── VisualFeedbackManager.kt # Feedback control
+│       │   │   │   ├── NetworkConnectivityManager.kt
+│       │   │   │   ├── NetworkNotifier.kt       # Online/offline
+│       │   │   │   ├── Logger.kt                # Logging utility
+│       │   │   │   ├── LLMHelperFunctions.kt    # LLM utilities
+│       │   │   │   └── (more utilities)
+│       │   │   │
+│       │   │   └── v2/                          # Version 2 architecture
+│       │   │       ├── Agent.kt                 # Main agent loop
+│       │   │       ├── AgentModel.kt            # Data models
+│       │   │       ├── AgentService.kt          # Foreground service
+│       │   │       ├── PromptBuilder.kt         # Prompt construction
+│       │   │       │
+│       │   │       ├── actions/                 # Action system
+│       │   │       │   ├── Action.kt            # Action definitions
+│       │   │       │   └── ActionExecutor.kt    # Execution engine
+│       │   │       │
+│       │   │       ├── fs/                      # File system
+│       │   │       │   └── FileSystem.kt        # File operations
+│       │   │       │
+│       │   │       ├── llm/                     # LLM integration
+│       │   │       │   ├── GeminiAPI.kt         # Modern Gemini client
+│       │   │       │   └── models.kt            # Data models
+│       │   │       │
+│       │   │       ├── logging/                 # Task logging
+│       │   │       │   └── TaskLogger.kt        # Log tasks
+│       │   │       │
+│       │   │       ├── message_manager/         # Message management
+│       │   │       │   └── MemoryManager.kt     # Short-term memory
+│       │   │       │
+│       │   │       └── perception/              # Perception layer
+│       │   │           ├── Perception.kt        # Screen analysis
+│       │   │           └── SemanticParser.kt    # UI parsing
+│       │   │
+│       │   └── res/                              # Resources
+│       │       ├── anim/                         # Animations
+│       │       ├── drawable/                     # Images & vectors
+│       │       ├── font/                         # Custom fonts
+│       │       ├── layout/                       # UI layouts
+│       │       ├── menu/                         # Menu definitions
+│       │       ├── mipmap-*/                     # App icons
+│       │       ├── values/                       # Strings, colors, themes
+│       │       ├── values-night/                 # Dark theme
+│       │       └── xml/                          # Configuration
+│       │           ├── accessibility_service_config.xml
+│       │           ├── shortcuts.xml
+│       │           ├── network_security_config.xml
+│       │           └── remote_config_defaults.xml
+│       │
+│       └── test/                                  # Unit tests
+│           └── java/com/seemoo/openflow/
+│               ├── ExampleUnitTest.kt
+│               ├── VersionManagementTest.kt
+│               ├── WakeWordButtonRelocationTest.kt
+│               ├── agent/
+│               └── utilities/
+│
+├── docs/                                          # Documentation
+│   ├── ACCESSIBILITY_DISCLOSURE_IMPROVEMENTS.md
+│   ├── AUTOMATED_VERSION_MANAGEMENT.md
+│   ├── DIRECT_APP_OPENING.md
+│   ├── INTERACTIVE_DIALOGUE_SYSTEM.md
+│   ├── MEMORY_STATUS.md
+│   ├── PORCUPINE_SETUP.md
+│   ├── SPEECH_COORDINATOR_IMPLEMENTATION.md
+│   ├── STT_IMPLEMENTATION.md
+│   ├── STT_MULTIPLE_ATTEMPTS_UPDATE.md
+│   ├── STT_THREAD_SAFETY_FIX.md
+│   ├── STT_USER_INPUT_IMPLEMENTATION.md
+│   ├── TRIGGER_SYSTEM.md
+│   ├── TTS_DEBUG_MODE.md
+│   └── WAKE_WORD_BUTTON_RELOCATION.md
+│
+├── gradle/                                        # Gradle configuration
+│   ├── libs.versions.toml                        # Version catalog
+│   └── wrapper/                                   # Gradle wrapper
+│
+├── build.gradle.kts                               # Root build file
+├── settings.gradle.kts                            # Project settings
+├── gradle.properties                              # Gradle properties
+├── gradlew                                        # Unix wrapper script
+├── gradlew.bat                                    # Windows wrapper script
+├── version.properties                             # Version tracking
+├── local.properties                               # Local config (gitignored)
+├── local.properties.template                      # Template for local config
+├── privacy-policy.html                            # Privacy policy
+├── README.md                                      # Project readme
+└── digest.txt                                     # Project digest
+
+================================================================================
+6. CORE COMPONENTS DEEP DIVE
+================================================================================
+
+6.1 AGENT V2 (v2/)
+------------------
+The version 2 architecture represents a complete rewrite with better separation
+of concerns and more robust error handling.
+
+Agent.kt (Main Loop):
+• Entry Point: run(initialTask: String, maxSteps: Int)
+• Loop Structure:
+  1. SENSE: perception.analyze() → ScreenState
+  2. THINK: 
+     - memoryManager.createStateMessage() → Build prompt
+     - llmApi.generateAgentOutput() → Get LLM decision
+  3. ACT: 
+     - actionExecutor.execute() → Perform actions
+     - Record to history
+  4. CHECK: 
+     - If "done" action → exit
+     - If max steps → exit
+     - If consecutive failures >= maxFailures → exit
+     - Else continue loop
+
+AgentService.kt (Lifecycle):
+• Foreground Service: Ensures long-running execution
+• Task Queue: ConcurrentLinkedQueue for multiple tasks
+• Notifications: Persistent notification while running
+• Firebase Integration: Logs tasks to Firestore
+• Stop Mechanism: Public stop() method and stop action intent
+
+PromptBuilder.kt:
+• System Prompt: Loaded from assets/prompts/system_prompt.md
+• Dynamic Sections:
+  - User Info
+  - Agent History
+  - User Request
+  - Agent State (files, step, timestamp)
+  - Android State (app, elements, screenshot)
+  - Read State (transient data from last action)
+• Action Signatures: Injected dynamically based on available actions
+
+6.2 PERCEPTION SYSTEM
+----------------------
+Perception.kt:
+• analyze() → ScreenState
+• Two modes:
+  1. XML Mode (default): Parse accessibility hierarchy
+  2. Screenshot Mode: Capture visual representation
+• SemanticParser: Extract interactive elements with IDs
+
+Eyes.kt (Screen Capture):
+• openEyes(): Bitmap screenshot via Accessibility Service
+• openXMLEyes(): Formatted XML hierarchy
+• openPureXMLEyes(): Raw XML
+• getRawScreenData(): Combined data (XML + scroll info + dimensions)
+• Efficiency: Single call for all data
+
+SemanticParser.kt:
+• Input: AccessibilityNodeInfo hierarchy
+• Output: List of interactive elements with:
+  - Numeric ID
+  - Text description
+  - Resource ID
+  - State (clickable, enabled, focusable)
+  - Type (widget class name)
+  - Bounds (coordinates)
+  - Hierarchy (indentation for parent-child)
+
+6.3 ACTION SYSTEM
+-----------------
+Action.kt (Sealed Class):
+• Type-safe action definitions
+• Custom serializer for LLM JSON output
+• Data-driven registry (Spec companion object)
+• Snake_case for LLM compatibility
+
+ActionExecutor.kt:
+• execute(action: Action, screenState, context, fileSystem) → ActionResult
+• Handles all action types:
+  - UI: tap, long-press, scroll, input
+  - Navigation: back, home, switch app
+  - Apps: open app, launch intent
+  - Communication: speak, ask
+  - Files: read, write, append
+  - Web: search Google
+  - Control: wait, done
+
+Finger.kt (Low-level Gestures):
+• Accessibility Service wrapper
+• Methods:
+  - tap(x, y)
+  - longPress(x, y)
+  - swipe(startX, startY, endX, endY, duration)
+  - typeText(text)
+  - pressBack(), pressHome(), openRecents()
+  - openApp(packageName) - Direct app launch
+
+6.4 LLM INTEGRATION
+-------------------
+v2/llm/GeminiAPI.kt (Modern Client):
+• Features:
+  - Automatic proxy vs. direct API dispatch
+  - API key rotation via ApiKeyManager
+  - Exponential backoff retry
+  - Model caching (ConcurrentHashMap)
+  - JSON schema enforcement
+  - Task logging to filesystem
+
+• Proxy Mode (Primary):
+  - Routes through Google Cloud Function
+  - Uses BuildConfig.GCLOUD_PROXY_URL
+  - Adds X-API-Key header
+  - More secure (hides API keys)
+
+• Direct Mode (Fallback):
+  - Uses Google AI SDK directly
+  - Requires BuildConfig.GEMINI_API_KEYS
+  - Less secure but more reliable
+
+• Configuration:
+  - Model: "gemini-2.5-flash"
+  - Response format: JSON (enforced)
+  - Timeout: 60 seconds
+  - Max retries: 10
+
+api/GeminiApi.kt (Legacy):
+• Object singleton
+• Similar functionality to v2 but older architecture
+• Still used in some parts of the codebase
+
+6.5 MEMORY SYSTEM
+-----------------
+v2/message_manager/MemoryManager.kt:
+• Short-term memory for agent loop
+• Methods:
+  - addNewTask(task): Start new task
+  - createStateMessage(): Build step context
+  - getMessages(): Return full conversation
+  - addContextMessage(): Inject system notes
+
+• Message Types:
+  - System: Instruction/prompt
+  - User: User request
+  - Model: Agent response
+  - Function: Tool result
+
+v2/fs/FileSystem.kt:
+• Long-term persistent storage
+• Files:
+  - todo.md: Task checklist
+  - results.md: Accumulated findings
+  - Custom files: Agent can create/read/write
+• Methods:
+  - read(filename): Get file contents
+  - write(filename, content): Overwrite
+  - append(filename, content): Add to end
+  - list(): Get all files
+
+6.6 ACCESSIBILITY SERVICE
+--------------------------
+ScreenInteractionService.kt:
+• Core Android Accessibility Service
+• 1,141 lines of code
+• Capabilities:
+  - Global actions: back, home, recents, notifications
+  - Node traversal: Find elements by text/ID/class
+  - Gesture dispatch: Custom touch paths
+  - Screenshot capture: takeScreenshot API
+  - Window hierarchy: Dump to XML
+  - Keyboard input: Text injection
+  - Scrolling: ScrollableNodeInfo
+  - Event monitoring: AccessibilityEvent callback
+
+• Features:
+  - Debug mode: Visual tap indicators
+  - Bounding box overlay: Show element bounds
+  - Status bar detection: Calculate top offset
+  - Foreground app: Package name retrieval
+  - TTS visualization: AudioWaveView integration
+
+• Configuration (xml/accessibility_service_config.xml):
+  - EVENT_TYPE_WINDOW_STATE_CHANGED
+  - EVENT_TYPE_WINDOW_CONTENT_CHANGED
+  - FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+  - FLAG_REQUEST_ENHANCED_WEB_ACCESSIBILITY
+  - Notification timeout: 100ms
+
+6.7 SPEECH SYSTEM
+-----------------
+STTManager.kt:
+• Android SpeechRecognizer wrapper
+• Press-and-hold interface
+• Features:
+  - Multiple language support
+  - Partial results
+  - Error handling
+  - Thread-safe callbacks
+  - Visual feedback integration
+
+TTSManager.kt:
+• Singleton TTS manager (625 lines)
+• Dual mode:
+  1. Native Android TTS (fallback)
+  2. Google Cloud TTS (primary)
+• Features:
+  - Audio caching (100 phrases, max 10 words)
+  - Voice preference management
+  - Debug mode control
+  - Queue management
+  - Utterance progress listener
+  - AudioTrack playback
+
+SpeechCoordinator.kt:
+• Coordinates STT and TTS
+• Prevents simultaneous speech
+• Thread-safe locks
+• Methods:
+  - speakToUser(text): High-priority speech
+  - listen(): Start STT
+  - stopListening(): Stop STT
+  - isSpeaking(): Check TTS status
+
+GoogleTTS.kt:
+• Google Cloud Text-to-Speech API client
+• Voice options:
+  - Chirp (en-US): Latest high-quality voice
+  - Journey (en-US): Alternative
+  - Studio voices: Various options
+• Audio format: LINEAR16, 24kHz
+• Caching: Local file cache for repeated phrases
+
+6.8 WAKE WORD SYSTEM
+--------------------
+PorcupineWakeWordDetector.kt:
+• Picovoice Porcupine SDK integration
+• Custom wake word: "Hey OpenFlow-AI"
+• Model: Panda_en_android_v3_0_0.ppn
+• Automatic key management via API
+
+WakeWordManager.kt:
+• High-level wake word control
+• Features:
+  - Engine selection (STT vs. Porcupine)
+  - State management (enabled/disabled)
+  - Error handling
+  - Broadcast notifications
+
+EnhancedWakeWordService.kt:
+• Foreground service for wake word detection
+• Always-listening mode
+• Notification with stop action
+• Battery optimization considerations
+
+6.9 TRIGGER SYSTEM
+------------------
+TriggerManager.kt:
+• Central trigger management
+• Persistence: SharedPreferences + Gson
+• Methods:
+  - addTrigger(trigger)
+  - removeTrigger(trigger)
+  - updateTrigger(trigger)
+  - getTriggers(): List
+  - rescheduleTrigger(triggerId)
+
+Trigger.kt (Data Class):
+• Fields:
+  - id: UUID
+  - type: TriggerType enum
+  - instruction: String (task to execute)
+  - isEnabled: Boolean
+  - hour/minute: Int? (for SCHEDULED_TIME)
+  - daysOfWeek: List<Int>? (0=Sunday, 6=Saturday)
+  - packageName/appName: String? (for NOTIFICATION)
+
+TriggerReceiver.kt:
+• BroadcastReceiver for trigger events
+• Actions:
+  - ACTION_EXECUTE_TASK: Run task
+  - From AlarmManager (scheduled)
+  - From NotificationListener (notification)
+• Starts AgentService with instruction
+
+BootReceiver.kt:
+• System BOOT_COMPLETED receiver
+• Reschedules all active triggers after reboot
+
+OpenFlowNotificationListenerService.kt:
+• NotificationListenerService implementation
+• Monitors all app notifications
+• Matches against configured triggers
+• Fires TriggerReceiver when matched
+
+TriggerMonitoringService.kt:
+• Foreground service for monitoring
+• Keeps notification listener alive
+
+6.10 OVERLAY SYSTEM
+-------------------
+OverlayManager.kt:
+• Singleton overlay controller
+• WindowManager integration
+• Lifecycle: startObserving() / stopObserving()
+• Permission: SYSTEM_ALERT_WINDOW required
+
+OverlayDispatcher.kt:
+• Static overlay API
+• Methods:
+  - show(text, priority, duration, position)
+  - clearAll()
+  - clearByPriority(priority)
+• Priority levels:
+  - TASKS: Task updates
+  - THOUGHTS: Agent reasoning
+  - ERRORS: Error messages
+  - STATUS: Status updates
+
+OverlayState.kt:
+• Tracks active overlays
+• Manages visibility and duration
+• Handles overlay lifecycle
+
+6.11 UI COMPONENTS
+------------------
+MainActivity.kt:
+• Entry point activity (826 lines)
+• Features:
+  - Login check
+  - Onboarding flow
+  - Permission management
+  - Wake word control
+  - Pro subscription status
+  - Task limit display
+  - Settings navigation
+  - Firebase integration
+
+DialogueActivity.kt:
+• Clarification question UI
+• Features:
+  - Question-by-question flow
+  - Voice + text input
+  - Progress indicator
+  - TTS question announcement
+  - Answer collection
+  - Enhanced instruction building
+
+SettingsActivity.kt:
+• App configuration
+• Settings:
+  - Show agent thoughts
+  - TTS voice selection
+  - Wake word engine
+  - Debug options
+  - Account management
+
+TriggersActivity.kt:
+• View all configured triggers
+• RecyclerView with TriggerAdapter
+• Enable/disable toggle
+• Delete confirmation
+• Navigation to CreateTriggerActivity
+
+CreateTriggerActivity.kt:
+• Dynamic trigger creation
+• Type-specific UI:
+  - SCHEDULED_TIME: TimePicker + day selection
+  - NOTIFICATION: App picker
+• Instruction input (EditText)
+• Save → TriggerManager
+
+================================================================================
+7. API INTEGRATIONS
+================================================================================
+
+7.1 GEMINI AI
+-------------
+Provider: Google AI (Gemini)
+Model: gemini-2.5-flash
+Purpose: Core reasoning and action planning
+
+Integration Points:
+• v2/llm/GeminiAPI.kt: Modern client
+• api/GeminiApi.kt: Legacy client
+
+Key Features:
+• Structured JSON output
+• Vision support (screenshots)
+• Multi-turn conversation
+• Function calling / tool use
+
+Configuration:
+• API Keys: GEMINI_API_KEYS (comma-separated)
+• Proxy URL: GCLOUD_PROXY_URL (optional)
+• Proxy Key: GCLOUD_PROXY_URL_KEY
+
+Request Format:
+{
+  "modelName": "gemini-2.5-flash",
+  "messages": [
+    {"role": "user", "parts": [{"text": "..."}]},
+    {"role": "model", "parts": [{"text": "..."}]}
+  ]
+}
+
+Response Format:
+Raw JSON string containing AgentOutput:
+{
+  "thinking": "...",
+  "evaluation_previous_goal": "...",
+  "memory": "...",
+  "next_goal": "...",
+  "action": [
+    {"tap_element": {"element_id": 123}}
+  ]
+}
+
+7.2 PICOVOICE (PORCUPINE)
+-------------------------
+Provider: Picovoice
+Product: Porcupine Wake Word Engine
+Purpose: Custom wake word detection
+
+Integration:
+• api/PorcupineWakeWordDetector.kt
+• api/PicovoiceKeyManager.kt
+
+Features:
+• Offline wake word detection
+• Custom wake word: "Hey OpenFlow-AI"
+• Low power consumption
+• High accuracy
+
+Configuration:
+• Access Key: PICOVOICE_ACCESS_KEY
+• Gateway URL: GCLOUD_GATEWAY_PICOVOICE_KEY
+• Model: Panda_en_android_v3_0_0.ppn
+
+Key Management:
+• Automatic fetch from API
+• 24-hour cache
+• Fallback to STT if unavailable
+
+7.3 GOOGLE CLOUD TTS
+--------------------
+Provider: Google Cloud Platform
+Service: Text-to-Speech API
+Purpose: High-quality voice synthesis
+
+Integration:
+• api/GoogleTts.kt
+
+Features:
+• Chirp voice (latest)
+• Multiple voice options
+• 24kHz audio quality
+• SSML support
+
+Configuration:
+• API Key: GOOGLE_TTS_API_KEY
+
+Voice Options:
+• en-US-Chirp-HD (primary)
+• en-US-Journey-D
+• en-US-Studio-O, M, Q
+
+7.4 TAVILY
+----------
+Provider: Tavily
+Service: Web Search API
+Purpose: Real-time web search
+
+Integration:
+• api/TavilyApi.kt
+
+Configuration:
+• API Key: TAVILY_API
+
+Usage:
+Currently integrated but limited use in agent actions
+
+7.5 MEM0
+--------
+Provider: Mem0
+Service: Memory API
+Purpose: Long-term memory storage
+
+Integration:
+• api/MemoryService.kt
+
+Status: DISABLED (as of December 2024)
+
+Configuration:
+• API Key: MEM0_API
+
+7.6 FIREBASE
+------------
+Services:
+1. Authentication:
+   - Google OAuth
+   - Email/password
+   - User profile management
+
+2. Firestore:
+   - User data
+   - Task history
+   - Memories (disabled)
+   - Triggers
+
+3. Remote Config:
+   - Feature flags
+   - A/B testing
+   - Dynamic configuration
+
+4. Crashlytics:
+   - Error reporting
+   - Crash analytics
+   - NDK support
+
+5. Analytics:
+   - Usage tracking
+   - Event logging
+   - User engagement
+
+6. Functions:
+   - Cloud functions
+   - Backend logic
+
+7.7 GOOGLE PLAY BILLING
+------------------------
+Service: In-App Purchases & Subscriptions
+Purpose: Pro tier monetization
+
+Integration:
+• ProPurchaseActivity.kt
+• utilities/FreemiumManager.kt
+
+Features:
+• Subscription management
+• Purchase verification
+• Grace period handling
+• RevenueCat integration (optional)
+
+Configuration:
+• SDK: billing-ktx:7.0.0
+• RevenueCat: REVENUE_CAT_PUBLIC_URL, REVENUECAT_API_KEY
+
+================================================================================
+8. BUILD SYSTEM & CONFIGURATION
+================================================================================
+
+8.1 VERSION MANAGEMENT
+----------------------
+System: Automated version incrementing
+
+Files:
+• version.properties: Stores current version
+  - VERSION_CODE: Integer (auto-increment)
+  - VERSION_NAME: Semantic version x.y.z
+
+Current Version:
+• Code: 57
+• Name: 1.0.66
+
+Behavior:
+• Debug builds: No increment
+• Release builds: Auto-increment before build
+• Task: incrementVersion (Gradle task)
+
+8.2 BUILD VARIANTS
+------------------
+Debug:
+• Debugging enabled
+• Logging enabled
+• TTS debug mode: on
+• Direct app opening: enabled
+• No minification
+• SHA1 fingerprint included
+
+Release:
+• Minification: ProGuard
+• Resource shrinking: enabled
+• Debugging disabled
+• Firebase Crashlytics: symbol upload
+• Direct app opening: disabled
+• Optimized APK
+
+8.3 BUILD CONFIGURATION
+-----------------------
+AGP Version: 8.9.2 (CRITICAL - DO NOT DOWNGRADE!)
+Gradle Version: 8.x
+Kotlin Version: 2.0.21
+Java Version: 11 (source/target compatibility)
+
+Build Features:
+• Compose: true
+• ViewBinding: true
+• BuildConfig: true
+
+Namespace: com.seemoo.openflow
+Application ID: com.seemoo.openflow
+
+8.4 DEPENDENCY MANAGEMENT
+--------------------------
+System: Version Catalog (gradle/libs.versions.toml)
+
+Benefits:
+• Centralized version management
+• Type-safe accessors
+• Easier updates
+• Shared versions across modules
+
+Format:
+[versions]
+agp = "8.9.2"
+kotlin = "2.0.21"
+
+[libraries]
+androidx-core-ktx = { group = "...", name = "...", version.ref = "..." }
+
+[plugins]
+android-application = { id = "...", version.ref = "..." }
+
+8.5 PROGUARD CONFIGURATION
+---------------------------
+File: app/proguard-rules.pro
+
+Rules:
+• Keep serialization classes
+• Keep Firebase models
+• Keep accessibility service
+• Keep Gemini SDK classes
+• Obfuscate other code
+
+8.6 BUILD COMMANDS
+------------------
+Development:
+./gradlew assembleDebug          # Build debug APK (no version change)
+./gradlew installDebug            # Install debug APK to device
+./gradlew test                    # Run unit tests
+
+Production:
+./gradlew assembleRelease         # Build release APK (auto-increment)
+./gradlew bundleRelease           # Build release bundle (auto-increment)
+
+Cleanup:
+./gradlew clean                   # Clean build artifacts
+
+8.7 LOCAL CONFIGURATION
+-----------------------
+File: local.properties (gitignored)
+Template: local.properties.template
+
+Required Keys:
+• sdk.dir: Android SDK path
+• GEMINI_API_KEYS: Comma-separated Gemini keys
+• PICOVOICE_ACCESS_KEY: Picovoice access key
+• TAVILY_API: Tavily search key
+• MEM0_API: Mem0 memory key (optional)
+• GOOGLE_TTS_API_KEY: Google TTS key
+• GCLOUD_GATEWAY_PICOVOICE_KEY: Gateway key
+• GCLOUD_GATEWAY_URL: Gateway URL
+• GCLOUD_PROXY_URL: Proxy URL
+• GCLOUD_PROXY_URL_KEY: Proxy auth key
+• REVENUE_CAT_PUBLIC_URL: RevenueCat URL (optional)
+• REVENUECAT_API_KEY: RevenueCat key (optional)
+
+Security:
+• NEVER commit local.properties
+• Use template for new developers
+• Rotate keys regularly
+
+8.8 PERMISSIONS
+---------------
+Required:
+• POST_NOTIFICATIONS: Show notifications
+• FOREGROUND_SERVICE: Long-running tasks
+• FOREGROUND_SERVICE_MICROPHONE: Voice input
+• FOREGROUND_SERVICE_SPECIAL_USE: Agent tasks
+• SYSTEM_ALERT_WINDOW: Overlays
+• INTERNET: API calls
+• RECORD_AUDIO: Voice input
+• RECEIVE_BOOT_COMPLETED: Trigger rescheduling
+• SCHEDULE_EXACT_ALARM: Precise triggers
+
+Optional (Debug):
+• QUERY_ALL_PACKAGES: Direct app opening (Play Store restricted)
+
+User-Granted:
+• Accessibility Service: Screen interaction
+• Notification Listener: Notification triggers
+• Default Assistant: Quick access
+
+================================================================================
+9. TESTING INFRASTRUCTURE
+================================================================================
+
+9.1 UNIT TESTS
+--------------
+Location: app/src/test/java/com/seemoo/openflow/
+
+Test Files:
+• ExampleUnitTest.kt: Basic JUnit test
+• VersionManagementTest.kt: Version increment tests
+• WakeWordButtonRelocationTest.kt: UI tests
+• agent/: Agent-specific tests
+• utilities/: Utility tests
+
+Framework:
+• JUnit 4.13.2
+• Kotlin test extensions
+
+Running:
+./gradlew test                    # All unit tests
+./gradlew test --tests "ClassName"  # Specific test
+
+9.2 INSTRUMENTED TESTS
+----------------------
+Location: app/src/androidTest/java/com/seemoo/
+
+Framework:
+• AndroidX Test JUnit 1.2.1
+• Espresso Core 3.6.1
+• UI Automator 2.3.0
+
+Requirements:
+• Android emulator or physical device
+• Accessibility service enabled
+
+Running:
+./gradlew connectedAndroidTest
+
+9.3 MANUAL TESTING
+------------------
+Essential Tests:
+1. Accessibility Service:
+   - Enable in Settings > Accessibility
+   - Verify screen capture works
+   - Test UI element interaction
+
+2. Voice Commands:
+   - Press microphone button
+   - Speak a command
+   - Verify execution
+
+3. Wake Word:
+   - Enable wake word service
+   - Say "Hey OpenFlow-AI"
+   - Verify activation
+
+4. Triggers:
+   - Create scheduled trigger
+   - Verify alarm fires
+   - Create notification trigger
+   - Verify notification detection
+
+5. Task Execution:
+   - Simple task: "Open Chrome"
+   - Complex task: "Send a message to John"
+   - Multi-step: "Find cheapest laptop on Amazon"
+
+9.4 TEST COVERAGE
+-----------------
+Current Coverage: Limited
+Focus Areas:
+• Agent loop logic
+• Action execution
+• API integrations
+• Error handling
+
+Gaps:
+• UI testing
+• Integration testing
+• End-to-end testing
+• Performance testing
+
+================================================================================
+10. DOCUMENTATION
+================================================================================
+
+10.1 USER DOCUMENTATION
+-----------------------
+README.md:
+• Project overview
+• Features list
+• Getting started guide
+• Installation instructions
+• Demo videos
+• License information
+
+privacy-policy.html:
+• Privacy policy for Play Store
+• Data collection disclosure
+• User rights
+
+10.2 DEVELOPER DOCUMENTATION
+-----------------------------
+.github/copilot-instructions.md:
+• Development guidelines
+• Build procedures
+• Version management
+• Testing requirements
+• Common issues
+
+docs/:
+• ACCESSIBILITY_DISCLOSURE_IMPROVEMENTS.md
+  - Permission disclosure enhancements
+  
+• AUTOMATED_VERSION_MANAGEMENT.md
+  - Version increment system
+  - Build workflows
+  
+• DIRECT_APP_OPENING.md
+  - Debug feature explanation
+  - Play Store compliance
+  
+• INTERACTIVE_DIALOGUE_SYSTEM.md
+  - Clarification agent design
+  - User flow diagrams
+  
+• MEMORY_STATUS.md
+  - Current memory system status
+  - Future plans
+  
+• PORCUPINE_SETUP.md
+  - Wake word configuration
+  - API key management
+  
+• SPEECH_COORDINATOR_IMPLEMENTATION.md
+  - STT/TTS coordination
+  - Thread safety
+  
+• STT_IMPLEMENTATION.md
+  - Speech-to-text setup
+  - Press-and-hold interface
+  
+• STT_MULTIPLE_ATTEMPTS_UPDATE.md
+  - Retry mechanism
+  
+• STT_THREAD_SAFETY_FIX.md
+  - Concurrency fixes
+  
+• STT_USER_INPUT_IMPLEMENTATION.md
+  - User input handling
+  
+• TRIGGER_SYSTEM.md
+  - Complete trigger documentation
+  - Architecture and implementation
+  
+• TTS_DEBUG_MODE.md
+  - Debug mode explanation
+  - Configuration options
+  
+• WAKE_WORD_BUTTON_RELOCATION.md
+  - UI changes for wake word
+
+10.3 CODE DOCUMENTATION
+-----------------------
+Code Comments:
+• KDoc for public APIs
+• Inline comments for complex logic
+• TODO markers for future work
+• WARNING markers for critical sections
+
+Documentation Quality:
+• High: Core agent loop, actions, API clients
+• Medium: Utilities, UI components
+• Low: Legacy code, experimental features
+
+10.4 SYSTEM PROMPT
+------------------
+assets/prompts/system_prompt.md:
+• Complete agent instructions
+• Action definitions
+• Reasoning patterns
+• Output format specification
+• 210 lines of detailed guidance
+
+Purpose:
+• Define agent behavior
+• Ensure consistent reasoning
+• Guide action selection
+• Format LLM output
+
+================================================================================
+11. FUTURE ROADMAP
+================================================================================
+
+11.1 PLANNED FEATURES
+---------------------
+⚠️ Note: Roadmap not updated recently
+
+High Priority:
+• Memory system restoration:
+  - Rebuild architecture
+  - Enhanced privacy
+  - Better performance
+  - User control
+
+• Multi-app workflows:
+  - Complex task chaining
+  - Cross-app data transfer
+  - State preservation
+
+• Improved error handling:
+  - Better recovery strategies
+  - User-friendly error messages
+  - Fallback actions
+
+• Performance optimization:
+  - Faster action execution
+  - Reduced latency
+  - Battery optimization
+
+Medium Priority:
+• Voice assistant integration:
+  - Google Assistant replacement
+  - Bixby compatibility
+  - Alexa integration
+
+• Smart home control:
+  - IoT device support
+  - Home automation
+  - Routine creation
+
+• Personalization:
+  - User preferences learning
+  - Adaptive behavior
+  - Custom shortcuts
+
+Low Priority:
+• Multi-language support:
+  - Localization
+  - Non-English models
+  - Regional adaptations
+
+• Advanced UI:
+  - Material You theming
+  - Custom themes
+  - Widget support
+
+11.2 KNOWN ISSUES
+-----------------
+• Memory system disabled (temporary)
+• Wake word may fail if API unavailable
+• Direct app opening restricted by Play Store
+• Some apps block accessibility service
+• Network connectivity required for core features
+• First-time load can be slow (20-30 seconds)
+
+11.3 TECHNICAL DEBT
+-------------------
+• Legacy GeminiApi.kt should be fully migrated to v2
+• Test coverage needs expansion
+• Some UI code needs refactoring
+• Documentation gaps in older components
+• Hardcoded strings in some places
+
+================================================================================
+12. DEVELOPMENT NOTES
+================================================================================
+
+12.1 CRITICAL RULES
+-------------------
+⚠️ NEVER CHANGE AGP VERSION:
+• Must remain 8.9.2
+• This is the latest stable version
+• DO NOT downgrade to 8.5.2 or any older version
+• Always verify compatibility before dependency updates
+
+⚠️ BUILD TIMEOUTS:
+• First build: 20-30 minutes
+• NEVER cancel builds
+• Set timeout to 45-60 minutes minimum
+• Subsequent builds: 3-8 minutes
+
+⚠️ ANDROID ENVIRONMENT REQUIRED:
+• Requires Android Studio or Android SDK
+• Will NOT build in basic Linux CI
+• SDK must be at /usr/local/lib/android/sdk or ANDROID_SDK_ROOT
+• Requires JDK 11+ (OpenJDK 17 recommended)
+
+12.2 DEVELOPMENT WORKFLOW
+-------------------------
+1. Setup:
+   - Clone repository
+   - Copy local.properties.template to local.properties
+   - Add all required API keys
+   - Open in Android Studio
+   - Let Gradle sync
+
+2. Building:
+   - Debug: ./gradlew assembleDebug (no version change)
+   - Release: ./gradlew assembleRelease (auto-increment)
+   - Clean: ./gradlew clean (if needed)
+
+3. Testing:
+   - Unit tests: ./gradlew test
+   - Install: ./gradlew installDebug
+   - Manual testing on device/emulator
+
+4. Debugging:
+   - View logs: adb logcat | grep GeminiApi
+   - Enable debug mode in settings
+   - Check accessibility service status
+   - Verify API keys
+
+12.3 COMMON ISSUES
+------------------
+Build Failures:
+• "Plugin not found": Check Android SDK installation
+• "API key missing": Verify local.properties
+• Memory issues: Increase JVM heap in gradle.properties
+  org.gradle.jvmargs=-Xmx4g
+
+Runtime Issues:
+• Accessibility not working: Enable in Settings
+• Voice not responding: Check microphone permissions
+• API failures: Verify internet and API keys
+• TTS not working: Check TTS engine installation
+
+12.4 BEST PRACTICES
+-------------------
+Code Style:
+• Follow Kotlin conventions
+• Use KDoc for public APIs
+• Meaningful variable names
+• Extract constants
+
+Git Workflow:
+• Never commit local.properties
+• Never commit API keys
+• Clear commit messages
+• Reference issue numbers
+
+Testing:
+• Write tests for new features
+• Manual test on real device
+• Verify accessibility permissions
+• Check TTS and STT
+
+Performance:
+• Minimize UI thread work
+• Use coroutines for async operations
+• Cache expensive operations
+• Optimize image loading
+
+12.5 DEPLOYMENT
+---------------
+Pre-release Checklist:
+✓ All tests passing
+✓ Manual testing complete
+✓ API keys configured
+✓ Version incremented
+✓ ProGuard rules updated
+✓ Crashlytics configured
+✓ Privacy policy updated
+
+Release Process:
+1. ./gradlew clean
+2. ./gradlew bundleRelease
+3. Sign bundle with release keystore
+4. Upload to Play Store Console
+5. Update release notes
+6. Submit for review
+
+Post-release:
+• Monitor Crashlytics
+• Check user feedback
+• Track analytics
+• Plan next iteration
+
+12.6 SECURITY CONSIDERATIONS
+----------------------------
+API Keys:
+• Rotate regularly
+• Use proxy when possible
+• Never hardcode in code
+• Store in local.properties only
+
+User Data:
+• Minimize collection
+• Encrypt sensitive data
+• Follow privacy policy
+• GDPR compliance
+
+Permissions:
+• Request only when needed
+• Explain why needed
+• Handle denials gracefully
+• Follow Android best practices
+
+================================================================================
+END OF SUMMARY
+================================================================================
+
+This summary document provides a comprehensive overview of the OpenFlow-AI
+Android project as of February 12, 2026. It covers architecture, features,
+technical implementation, build system, APIs, and development guidelines.
+
+For questions or contributions, visit:
+GitHub: https://github.com/simoabid/OpenFlow-AI
+Discord: https://discord.gg/b2hxFNXvWk
+
+Total Lines of Code (estimated): ~15,000+ lines of Kotlin
+Key Components: 80+ files
+Documentation Files: 14+ markdown files
+Test Files: 5+ test files

@@ -13,10 +13,9 @@ class UserProfileManager(private val context: Context) {
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
+    // Profile is always complete since we don't require authentication
     fun isProfileComplete(): Boolean {
-        val name = getName()
-        val email = getEmail()
-        return !name.isNullOrBlank() && !email.isNullOrBlank() && Patterns.EMAIL_ADDRESS.matcher(email).matches()
+        return true
     }
 
     fun saveProfile(name: String, email: String) {

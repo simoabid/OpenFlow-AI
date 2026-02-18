@@ -12,7 +12,7 @@ abstract class BaseNavigationActivity : AppCompatActivity() {
     protected abstract fun getCurrentNavItem(): NavItem
 
     enum class NavItem {
-        HOME, TRIGGERS, MOMENTS, UPGRADE, SETTINGS
+        HOME, TRIGGERS, MOMENTS, SETTINGS
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -59,15 +59,6 @@ abstract class BaseNavigationActivity : AppCompatActivity() {
                 }
             }
             alpha = if (currentItem == NavItem.HOME) 1.0f else 0.7f
-        }
-        
-        findViewById<LinearLayout>(R.id.nav_upgrade).apply {
-            setOnClickListener {
-                if (currentItem != NavItem.UPGRADE) {
-                    navigateToActivity(ProPurchaseActivity::class.java, currentItem)
-                }
-            }
-            alpha = if (currentItem == NavItem.UPGRADE) 1.0f else 0.7f
         }
         
         findViewById<LinearLayout>(R.id.nav_settings).apply {

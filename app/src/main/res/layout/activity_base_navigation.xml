@@ -95,32 +95,6 @@
 
         </LinearLayout>
 
-        <!-- Upgrade -->
-        <LinearLayout
-            android:id="@+id/nav_upgrade"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="?attr/selectableItemBackground"
-            android:gravity="center"
-            android:orientation="vertical">
-
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@drawable/pro" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="Buy Pro"
-                android:textColor="#FFFFFF"
-                android:textSize="12sp" />
-        </LinearLayout>
-
         <!-- Settings -->
         <LinearLayout
             android:id="@+id/nav_settings"

@@ -3,9 +3,9 @@
     android:minWidth="110dp"
     android:minHeight="110dp"
     android:updatePeriodMillis="0"
-    android:initialLayout="@layout/openflow_widget_layout"
+    android:initialLayout="@layout/panda_widget_layout"
     android:description="@string/shortcut_wake_up_long"
-    android:previewLayout="@layout/openflow_widget_layout"
+    android:previewLayout="@layout/panda_widget_layout"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen">
 </appwidget-provider>

@@ -21,7 +21,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.seemoo.openflow.data.UserMemory
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.snackbar.Snackbar
-import com.google.firebase.auth.FirebaseAuth
+import com.seemoo.openflow.utilities.UserIdManager
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
@@ -38,12 +38,13 @@ class MemoriesActivity : AppCompatActivity() {
     
     
     private val db = FirebaseFirestore.getInstance()
-    private val auth = FirebaseAuth.getInstance()
+    private lateinit var userIdManager: UserIdManager
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_memories)
         
+        userIdManager = UserIdManager(this)
         setupViews()
         setupRecyclerView()
         loadMemories()
@@ -129,13 +130,9 @@ class MemoriesActivity : AppCompatActivity() {
     }
     
     private fun loadMemories() {
-        val user = auth.currentUser
-        if (user == null) {
-            updateUI(emptyList())
-            return
-        }
+        val userId = userIdManager.getOrCreateUserId()
 
-        val docRef = db.collection("users").document(user.uid)
+        val docRef = db.collection("users").document(userId)
         docRef.addSnapshotListener { snapshot, e ->
             if (e != null) {
                 Log.w("MemoriesActivity", "Listen failed.", e)
@@ -230,7 +227,7 @@ class MemoriesActivity : AppCompatActivity() {
     }
     
     private fun addMemory(memoryText: String) {
-        val user = auth.currentUser ?: return
+        val userId = userIdManager.getOrCreateUserId()
         val newMemory = UserMemory(
             id = UUID.randomUUID().toString(),
             text = memoryText,
@@ -238,7 +235,7 @@ class MemoriesActivity : AppCompatActivity() {
             createdAt = Date()
         )
         
-        val docRef = db.collection("users").document(user.uid)
+        val docRef = db.collection("users").document(userId)
         
         // We need to convert UserMemory to a Map because Firestore arrayUnion works best with Maps or exact object matches
         // But since we are using custom objects, we should be careful.
@@ -267,8 +264,8 @@ class MemoriesActivity : AppCompatActivity() {
     }
 
     private fun updateMemory(oldMemory: UserMemory, newText: String) {
-        val user = auth.currentUser ?: return
-        val docRef = db.collection("users").document(user.uid)
+        val userId = userIdManager.getOrCreateUserId()
+        val docRef = db.collection("users").document(userId)
 
         // To update an item in an array, we have to remove the old one and add the new one.
         // This is not atomic unless we use a transaction, but for this simple app it's probably fine.
@@ -318,8 +315,8 @@ class MemoriesActivity : AppCompatActivity() {
     }
     
     private fun deleteMemory(memory: UserMemory) {
-        val user = auth.currentUser ?: return
-        val docRef = db.collection("users").document(user.uid)
+        val userId = userIdManager.getOrCreateUserId()
+        val docRef = db.collection("users").document(userId)
         
         // We need to match the object exactly to remove it via arrayRemove.
         // But we might have issues with Timestamp precision or other fields.
