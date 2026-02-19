@@ -41,6 +41,7 @@ class TTSManager private constructor(private val context: Context) : TextToSpeec
 
     private var audioTrack: AudioTrack? = null
     private var googleTtsPlaybackDeferred: CompletableDeferred<Unit>? = null
+    private var nativeTtsDeferred: CompletableDeferred<Unit>? = null
 
     var utteranceListener: ((isSpeaking: Boolean) -> Unit)? = null
 
@@ -278,9 +279,11 @@ class TTSManager private constructor(private val context: Context) : TextToSpeec
                 override fun onStart(utteranceId: String?) { utteranceListener?.invoke(true) }
                 override fun onDone(utteranceId: String?) {
                     utteranceListener?.invoke(false)
+                    nativeTtsDeferred?.complete(Unit)
                 }
                 override fun onError(utteranceId: String?) {
                     utteranceListener?.invoke(false)
+                    nativeTtsDeferred?.completeExceptionally(Exception("Native TTS utterance error"))
                 }
             })
             isNativeTtsInitialized.complete(Unit)
@@ -333,8 +336,20 @@ class TTSManager private constructor(private val context: Context) : TextToSpeec
         } catch (e: Exception) {
             if (e is CancellationException) throw e // Re-throw cancellation to stop execution
             Log.e("TTSManager", "Google TTS failed: ${e.message}. Falling back to native engine.")
+            speakNative(text)
+        }
+    }
+
+    private suspend fun speakNative(text: String) {
+        try {
             isNativeTtsInitialized.await()
+            nativeTtsDeferred = CompletableDeferred()
             nativeTts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, this.hashCode().toString())
+            withTimeoutOrNull(30_000) { nativeTtsDeferred?.await() }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e("TTSManager", "Native TTS fallback failed: ${e.message}")
         }
     }
     
@@ -576,7 +591,7 @@ class TTSManager private constructor(private val context: Context) : TextToSpeec
         } catch (e: Exception) {
             if (e is CancellationException) throw e
             Log.e("TTSManager", "Failed to speak chunk: ${chunk.take(50)}... Error: ${e.message}")
-            // Continue with next chunk instead of falling back to native TTS for the entire text
+            throw e // Propagate so speak() can fall back to native TTS
         }
     }
 

@@ -368,6 +368,7 @@ class ConversationalAgentService : Service() {
         // --- CHANGE 4: Check if we are in text mode before starting to listen ---
         if (isTextModeActive) {
             Log.d("ConvAgent", "In text mode, ensuring input box is visible and skipping voice listening.")
+            openflowStateManager.setState(OpenFlowState.IDLE) // Reset from SPEAKING so UI doesn't stay stuck
             // Post to main handler to ensure UI operations are on the main thread.
             mainHandler.post {
                 showInputBoxIfNeeded() // Re-show the input box for the next turn.
